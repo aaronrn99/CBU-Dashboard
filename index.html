@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CBU Dashboard — Architecture Fall 2026</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+    <!-- Sidebar Overlay (mobile) -->
+    <div class="overlay-bg" id="overlayBg"></div>
+
+    <!-- Sidebar -->
+    <nav class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="logo">
+                <span class="logo-icon">◈</span>
+                <div>
+                    <div class="logo-title">CBU Dashboard</div>
+                    <div class="logo-subtitle">Architecture · Fall 2026</div>
+                </div>
+            </div>
+        </div>
+        <ul class="nav-links">
+            <li>
+                <a href="#assignments" class="nav-link active" data-section="assignments">
+                    <span class="nav-icon">📋</span> Assignments
+                </a>
+            </li>
+            <li>
+                <a href="#todos" class="nav-link" data-section="todos">
+                    <span class="nav-icon">✓</span> To-Do List
+                </a>
+            </li>
+            <li>
+                <a href="#studio" class="nav-link" data-section="studio">
+                    <span class="nav-icon">🏗</span> Studio Projects
+                </a>
+            </li>
+            <li>
+                <a href="#schedule" class="nav-link" data-section="schedule">
+                    <span class="nav-icon">📅</span> Weekly Schedule
+                </a>
+            </li>
+            <li>
+                <a href="#notes" class="nav-link" data-section="notes">
+                    <span class="nav-icon">📝</span> Notes
+                </a>
+            </li>
+        </ul>
+        <div class="sidebar-footer">
+            <button class="btn btn-ghost full-width" id="canvasSettingsBtn">⚙ Canvas Settings</button>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+
+        <!-- Topbar -->
+        <header class="topbar">
+            <div class="topbar-left">
+                <button class="hamburger" id="hamburger" aria-label="Toggle sidebar">☰</button>
+                <h1 class="page-title" id="pageTitle">Assignments</h1>
+            </div>
+            <div class="topbar-right">
+                <span class="date-display" id="dateDisplay"></span>
+            </div>
+        </header>
+
+        <!-- Sections -->
+        <div class="sections-container">
+
+            <!-- Assignments -->
+            <section id="assignments" class="section active">
+                <div class="section-header">
+                    <h2>Assignments</h2>
+                    <button class="btn btn-primary" id="syncCanvas">↻ Sync Canvas</button>
+                </div>
+                <div class="canvas-status" id="canvasStatus"></div>
+                <div id="assignmentsList"></div>
+            </section>
+
+            <!-- To-Do List -->
+            <section id="todos" class="section">
+                <div class="section-header">
+                    <h2>To-Do List</h2>
+                </div>
+                <div class="todo-input-row">
+                    <input type="text" id="todoInput" class="input-field" placeholder="Add a new task…">
+                    <select id="todoPriority" class="select-field">
+                        <option value="low">Low</option>
+                        <option value="medium" selected>Medium</option>
+                        <option value="high">High</option>
+                    </select>
+                    <button class="btn btn-primary" id="addTodoBtn">Add</button>
+                </div>
+                <ul class="todo-list" id="todoList"></ul>
+            </section>
+
+            <!-- Studio Projects -->
+            <section id="studio" class="section">
+                <div class="section-header">
+                    <h2>Studio Projects</h2>
+                    <button class="btn btn-primary" id="addProjectBtn">+ New Project</button>
+                </div>
+                <div class="projects-grid" id="projectsGrid"></div>
+            </section>
+
+            <!-- Weekly Schedule -->
+            <section id="schedule" class="section">
+                <div class="section-header">
+                    <h2>Weekly Schedule</h2>
+                    <button class="btn btn-ghost" id="editScheduleBtn">Edit</button>
+                </div>
+                <div id="scheduleGrid"></div>
+            </section>
+
+            <!-- Notes -->
+            <section id="notes" class="section">
+                <div class="section-header">
+                    <h2>Notes</h2>
+                    <button class="btn btn-primary" id="addNoteBtn">+ New Note</button>
+                </div>
+                <div class="notes-grid" id="notesGrid"></div>
+            </section>
+
+        </div>
+    </main>
+
+    <!-- Canvas Settings Modal -->
+    <div class="modal-overlay" id="canvasModal" role="dialog" aria-modal="true" aria-labelledby="canvasModalTitle">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="canvasModalTitle">Canvas API Settings</h3>
+                <button class="modal-close" id="closeCanvasModal" aria-label="Close">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="canvasUrl">Canvas Base URL</label>
+                    <input type="url" id="canvasUrl" class="input-field" placeholder="https://your-school.instructure.com">
+                </div>
+                <div class="form-group">
+                    <label for="canvasToken">API Token</label>
+                    <input type="password" id="canvasToken" class="input-field" placeholder="Your Canvas API token">
+                    <p class="form-hint">Canvas → Account → Settings → New Access Token</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-ghost" id="cancelCanvasModal">Cancel</button>
+                <button class="btn btn-primary" id="saveCanvasSettings">Save Settings</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Project Modal -->
+    <div class="modal-overlay" id="projectModal" role="dialog" aria-modal="true" aria-labelledby="projectModalTitle">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="projectModalTitle">New Studio Project</h3>
+                <button class="modal-close" id="closeProjectModal" aria-label="Close">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="projectName">Project Name</label>
+                    <input type="text" id="projectName" class="input-field" placeholder="e.g. Urban Housing Studio">
+                </div>
+                <div class="form-group">
+                    <label for="projectCourse">Course</label>
+                    <input type="text" id="projectCourse" class="input-field" placeholder="e.g. ARCH 401">
+                </div>
+                <div class="form-group">
+                    <label for="projectPhase">Current Phase</label>
+                    <select id="projectPhase" class="select-field">
+                        <option value="concept">Concept</option>
+                        <option value="schematic">Schematic Design</option>
+                        <option value="dd">Design Development</option>
+                        <option value="cd">Construction Documents</option>
+                        <option value="final">Final Presentation</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="projectDue">Due Date</label>
+                    <input type="date" id="projectDue" class="input-field">
+                </div>
+                <div class="form-group">
+                    <label for="projectDesc">Description</label>
+                    <textarea id="projectDesc" class="input-field textarea" placeholder="Brief project description…"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-ghost" id="cancelProjectModal">Cancel</button>
+                <button class="btn btn-primary" id="saveProjectBtn">Add Project</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Schedule Cell Edit Modal -->
+    <div class="modal-overlay" id="scheduleModal" role="dialog" aria-modal="true" aria-labelledby="scheduleModalTitle">
+        <div class="modal" style="max-width:360px">
+            <div class="modal-header">
+                <h3 id="scheduleModalTitle">Edit Time Slot</h3>
+                <button class="modal-close" id="closeScheduleModal" aria-label="Close">✕</button>
+            </div>
+            <div class="modal-body">
+                <p class="form-hint" style="margin-bottom:12px" id="scheduleModalSubtitle"></p>
+                <div class="form-group">
+                    <label for="scheduleEventInput">Class / Event Name</label>
+                    <input type="text" id="scheduleEventInput" class="input-field" placeholder="e.g. ARCH 401 Studio">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-danger" id="clearScheduleSlot">Clear Slot</button>
+                <button class="btn btn-ghost" id="cancelScheduleModal">Cancel</button>
+                <button class="btn btn-primary" id="saveScheduleSlot">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/app.js"></script>
+</body>
+</html>
