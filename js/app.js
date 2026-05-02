@@ -536,8 +536,7 @@ const COURSE_BLOCKS = [
     },
 ];
 
-const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
-const DAY_FULL = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+const DAY_FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const TIMES = [
     '7:00 AM','8:00 AM','9:00 AM','10:00 AM','11:00 AM',
     '12:00 PM','1:00 PM','2:00 PM','3:00 PM','4:00 PM',
@@ -548,14 +547,13 @@ let scheduleWeekOffset = 0;  // 0 = current week, ±N = N weeks forward/back
 let scheduleEditing    = false;
 let pendingSlotKey     = null;
 
-// Returns the Monday of the week that contains today, shifted by `offset` weeks
-function getWeekMonday(offset) {
+// Returns the Sunday that starts the week containing today, shifted by `offset` weeks.
+// today.getDay() === 0 for Sunday, so subtracting it always lands on Sunday.
+function getWeekSunday(offset) {
     const today = new Date(); today.setHours(0, 0, 0, 0);
-    const dow   = today.getDay();                      // 0=Sun … 6=Sat
-    const shift = dow === 0 ? -6 : 1 - dow;           // days back to Monday
-    const monday = new Date(today);
-    monday.setDate(today.getDate() + shift + offset * 7);
-    return monday;
+    const sun   = new Date(today);
+    sun.setDate(today.getDate() - today.getDay() + offset * 7);
+    return sun;
 }
 
 // Format a Date as "YYYY-MM-DD"
@@ -610,20 +608,22 @@ function renderSchedule() {
 
     const editCls = scheduleEditing ? 'editable' : '';
 
-    // ── Week dates (Mon–Fri) ────────────────────
-    const monday = getWeekMonday(scheduleWeekOffset);
-    const weekDates = Array.from({ length: 5 }, (_, i) => {
-        const d = new Date(monday);
-        d.setDate(monday.getDate() + i);
+    // ── Week dates (Sun–Sat) ────────────────────
+    const sunday = getWeekSunday(scheduleWeekOffset);
+    const weekDates = Array.from({ length: 7 }, (_, i) => {
+        const d = new Date(sunday);
+        d.setDate(sunday.getDate() + i);
         return d;
     });
 
-    // Update week-range label
+    // Update week-range label — "Sun, Sep 8 – Sat, Sep 14, 2026"
     const rangeEl = document.getElementById('scheduleWeekRange');
     if (rangeEl) {
-        const s = weekDates[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-        const e = weekDates[4].toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-        rangeEl.textContent = `${s} – ${e}`;
+        const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        const fmt = (d, yr) =>
+            `${DAY_FULL[d.getDay()].slice(0, 3)}, ${MON[d.getMonth()]} ${d.getDate()}` +
+            (yr ? `, ${d.getFullYear()}` : '');
+        rangeEl.textContent = `${fmt(weekDates[0], false)} – ${fmt(weekDates[6], true)}`;
     }
 
     // Dim "Today" button when already on the current week
@@ -640,7 +640,7 @@ function renderSchedule() {
     // ── Course-block coverage map ──────────────
     const timeIndex = {};
     TIMES.forEach((t, i) => { timeIndex[t] = i; });
-    const coverage = Array.from({ length: 5 }, () => ({}));
+    const coverage = Array.from({ length: DAY_FULL.length }, () => ({}));
     COURSE_BLOCKS.forEach(block => {
         const si = timeIndex[block.startTime];
         if (si === undefined) return;
