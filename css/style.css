@@ -52,6 +52,23 @@ body {
     -webkit-font-smoothing: antialiased;
 }
 
+/* ── Welcome Banner ────────────────────── */
+.welcome-banner {
+    background: var(--bg-0);
+    padding: 11px 28px;
+    text-align: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    font-family: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
+    font-size: 18px;
+    font-weight: 300;
+    font-style: italic;
+    color: var(--text-2);
+    letter-spacing: 0.08em;
+    flex-shrink: 0;
+    user-select: none;
+    min-height: 42px;
+}
+
 /* ── Scrollbar ─────────────────────────── */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }

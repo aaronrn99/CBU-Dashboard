@@ -59,6 +59,8 @@ function init() {
     };
 
     setDateDisplay();
+    updateWelcomeBanner();
+    setInterval(updateWelcomeBanner, 60000);
     renderAssignments();
     renderTodos();
     renderProjects();
@@ -72,7 +74,48 @@ function init() {
     bindEvents();
 }
 
-// ── Date ──────────────────────────────────────
+// ── Date & Banner ─────────────────────────────
+function getWelcomeMessage() {
+    const now   = new Date();
+    const month = now.getMonth() + 1;  // 1–12
+    const day   = now.getDate();
+    const hour  = now.getHours();
+
+    // Pack month+day into a comparable integer (MMDD)
+    const is = (m, d) => month === m && day === d;
+    const between = (m1, d1, m2, d2) => {
+        const n = month * 100 + day;
+        return n >= m1 * 100 + d1 && n <= m2 * 100 + d2;
+    };
+
+    // ── Proximity messages ─────────────────
+    // Thanksgiving (Nov 25–27) — checked before winter-break overlaps
+    if (between(11, 25, 11, 27)) return 'Enjoy your break, Aaron.';
+    if (between(11, 22, 11, 24)) return 'A few days until Thanksgiving break, Aaron.';
+    if (is(11, 18))              return '1 week until Thanksgiving break, Aaron.';
+    if (is(11, 11))              return '2 weeks until Thanksgiving break, Aaron.';
+    if (is(11, 4))               return '3 weeks until Thanksgiving break, Aaron.';
+
+    // Winter break / finals (Dec 11 = Semester Closes — beats "finals week")
+    if (month === 12 && day >= 11) return "Semester's done, Aaron.";
+    if (between(12, 7, 12, 10))  return 'Finals week, Aaron.';
+    if (is(12, 4))               return '1 week until winter break, Aaron.';
+    if (is(11, 27))              return '2 weeks until winter break, Aaron.';
+    if (is(11, 20))              return '3 weeks until winter break, Aaron.';
+
+    // ── Time-based fallback ────────────────
+    if (hour >= 5  && hour < 12) return 'Good morning, Aaron.';
+    if (hour >= 12 && hour < 17) return 'Good afternoon, Aaron.';
+    if (hour >= 17 && hour < 21) return 'Good evening, Aaron.';
+    if (hour >= 21)              return 'Working late, Aaron.';
+    return 'Up early, Aaron.';
+}
+
+function updateWelcomeBanner() {
+    const el = document.getElementById('welcomeBanner');
+    if (el) el.textContent = getWelcomeMessage();
+}
+
 function setDateDisplay() {
     const el = document.getElementById('dateDisplay');
     if (!el) return;
