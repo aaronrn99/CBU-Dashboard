@@ -148,36 +148,28 @@ function initBanner() {
     setInterval(advanceBanner, 20 * 60 * 1000);   // rotate every 20 minutes
 }
 
-// Cycling architectural background images behind the banner text.
-// Two layers alternate so the crossfade is a true blend (one fades in
-// while the previous fades out) rather than a cut.
+// Two <img> elements crossfade every 15 s. One fades in while the other
+// fades out — a true blend, not a cut. object-fit: cover is in the CSS.
 function initBannerImages() {
-    const bg = document.getElementById('bannerBg');
-    if (!bg) return;
+    const slideA = document.getElementById('bannerSlideA');
+    const slideB = document.getElementById('bannerSlideB');
+    if (!slideA || !slideB) return;
 
-    const TOTAL = 10;
-    const layers = [0, 1].map(() => {
-        const d = document.createElement('div');
-        d.className = 'banner-bg-layer';
-        bg.appendChild(d);
-        return d;
-    });
+    let current = slideA;
+    let next    = slideB;
+    let idx     = 0;
 
-    let current = 0;
-    let imgIdx  = 0;
-
-    // First image — set background then let CSS transition fade it in
-    layers[0].style.backgroundImage = `url('images/image1.jpg')`;
-    setTimeout(() => layers[0].classList.add('active'), 50);
+    // First image: set src, then let CSS transition fade it in
+    current.src = 'images/image1.jpg';
+    setTimeout(() => current.classList.add('active'), 50);
 
     setInterval(() => {
-        imgIdx          = (imgIdx + 1) % TOTAL;
-        const next      = 1 - current;
-        layers[next].style.backgroundImage = `url('images/image${imgIdx + 1}.jpg')`;
-        layers[next].classList.add('active');      // fade in next
-        layers[current].classList.remove('active'); // fade out current
-        current         = next;
-    }, 15000);  // crossfade every 15 seconds
+        idx      = (idx + 1) % 10;
+        next.src = `images/image${idx + 1}.jpg`;
+        next.classList.add('active');       // fade in
+        current.classList.remove('active'); // fade out
+        [current, next] = [next, current];  // swap roles
+    }, 15000);
 }
 
 function setDateDisplay() {
