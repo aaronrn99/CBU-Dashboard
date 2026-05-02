@@ -61,6 +61,7 @@ function init() {
 
     setDateDisplay();
     initBanner();
+    initBannerImages();
     renderAssignments();
     renderTodos();
     renderProjects();
@@ -120,7 +121,7 @@ function getBannerPool() {
 
 // Fade the banner to a new message (opacity transition is in CSS)
 function fadeToBannerMessage(msg) {
-    const el = document.getElementById('welcomeBanner');
+    const el = document.getElementById('bannerText');
     if (!el) return;
     el.style.opacity = '0';
     setTimeout(() => {
@@ -142,9 +143,41 @@ function advanceBanner() {
 function initBanner() {
     _bannerPool  = getBannerPool();
     _bannerIndex = 0;
-    const el = document.getElementById('welcomeBanner');
+    const el = document.getElementById('bannerText');
     if (el) el.textContent = _bannerPool[0];
     setInterval(advanceBanner, 20 * 60 * 1000);   // rotate every 20 minutes
+}
+
+// Cycling architectural background images behind the banner text.
+// Two layers alternate so the crossfade is a true blend (one fades in
+// while the previous fades out) rather than a cut.
+function initBannerImages() {
+    const bg = document.getElementById('bannerBg');
+    if (!bg) return;
+
+    const TOTAL = 10;
+    const layers = [0, 1].map(() => {
+        const d = document.createElement('div');
+        d.className = 'banner-bg-layer';
+        bg.appendChild(d);
+        return d;
+    });
+
+    let current = 0;
+    let imgIdx  = 0;
+
+    // First image — set background then let CSS transition fade it in
+    layers[0].style.backgroundImage = `url('images/image1.jpg')`;
+    setTimeout(() => layers[0].classList.add('active'), 50);
+
+    setInterval(() => {
+        imgIdx          = (imgIdx + 1) % TOTAL;
+        const next      = 1 - current;
+        layers[next].style.backgroundImage = `url('images/image${imgIdx + 1}.jpg')`;
+        layers[next].classList.add('active');      // fade in next
+        layers[current].classList.remove('active'); // fade out current
+        current         = next;
+    }, 15000);  // crossfade every 15 seconds
 }
 
 function setDateDisplay() {
