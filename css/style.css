@@ -912,6 +912,61 @@ body {
 
 .pdf-actions { display: flex; gap: 6px; flex-shrink: 0; align-items: center; }
 
+/* ── Schedule Navigation ────────────────── */
+.schedule-nav {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.schedule-week-range {
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--text-1);
+    min-width: 190px;
+    text-align: center;
+    letter-spacing: -0.01em;
+}
+
+.sched-day-name {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-2);
+    margin-bottom: 3px;
+}
+
+.sched-day-date {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-1);
+    margin-bottom: 4px;
+}
+
+.schedule-table th.sched-today-col {
+    background: var(--accent-dim);
+}
+
+.sched-today-col .sched-day-name,
+.sched-today-col .sched-day-date { color: var(--accent); }
+
+.sched-day-badge {
+    display: block;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 1px 5px;
+    border-radius: 3px;
+    margin: 1px auto 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 92%;
+    text-align: center;
+    letter-spacing: 0.02em;
+}
+
 /* ── Academic Calendar ──────────────────── */
 .cal-next-banner {
     align-items: center;

@@ -52,6 +52,7 @@ function init() {
     state.schedule       = load('schedule', {});
     state.canvasSettings = load('canvasSettings', { url: '', token: '' });
     state.assignments    = load('assignments', []);
+    state.calendarEvents = load('calendarEvents', []);
     state.thesis = {
         notes: load('thesis_notes', []),
         links: load('thesis_links', []),
@@ -69,7 +70,6 @@ function init() {
     renderThesisNotes();
     renderThesisLinks();
     renderThesisPdfs();
-    state.calendarEvents = load('calendarEvents', []);
     renderCalendar();
     bindEvents();
 }
@@ -544,8 +544,24 @@ const TIMES = [
     '5:00 PM','6:00 PM','7:00 PM','8:00 PM',
 ];
 
-let scheduleEditing = false;
-let pendingSlotKey  = null;
+let scheduleWeekOffset = 0;  // 0 = current week, ±N = N weeks forward/back
+let scheduleEditing    = false;
+let pendingSlotKey     = null;
+
+// Returns the Monday of the week that contains today, shifted by `offset` weeks
+function getWeekMonday(offset) {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const dow   = today.getDay();                      // 0=Sun … 6=Sat
+    const shift = dow === 0 ? -6 : 1 - dow;           // days back to Monday
+    const monday = new Date(today);
+    monday.setDate(today.getDate() + shift + offset * 7);
+    return monday;
+}
+
+// Format a Date as "YYYY-MM-DD"
+function toDateStr(d) {
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
 
 function toggleScheduleEdit() {
     scheduleEditing = !scheduleEditing;
@@ -594,12 +610,37 @@ function renderSchedule() {
 
     const editCls = scheduleEditing ? 'editable' : '';
 
-    // Map each time string to its row index
+    // ── Week dates (Mon–Fri) ────────────────────
+    const monday = getWeekMonday(scheduleWeekOffset);
+    const weekDates = Array.from({ length: 5 }, (_, i) => {
+        const d = new Date(monday);
+        d.setDate(monday.getDate() + i);
+        return d;
+    });
+
+    // Update week-range label
+    const rangeEl = document.getElementById('scheduleWeekRange');
+    if (rangeEl) {
+        const s = weekDates[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        const e = weekDates[4].toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        rangeEl.textContent = `${s} – ${e}`;
+    }
+
+    // Dim "Today" button when already on the current week
+    const todayBtn = document.getElementById('todayBtn');
+    if (todayBtn) todayBtn.style.opacity = scheduleWeekOffset === 0 ? '0.35' : '1';
+
+    // Today's date string for column highlighting
+    const now = new Date(); now.setHours(0, 0, 0, 0);
+    const todayStr = toDateStr(now);
+
+    // All calendar events used for day-header indicators
+    const allCal = [...CBU_FALL_2026, ...state.calendarEvents];
+
+    // ── Course-block coverage map ──────────────
     const timeIndex = {};
     TIMES.forEach((t, i) => { timeIndex[t] = i; });
-
-    // coverage[dayIdx][timeIdx] = { block, isStart: bool }
-    const coverage = Array.from({ length: DAY_FULL.length }, () => ({}));
+    const coverage = Array.from({ length: 5 }, () => ({}));
     COURSE_BLOCKS.forEach(block => {
         const si = timeIndex[block.startTime];
         if (si === undefined) return;
@@ -612,25 +653,42 @@ function renderSchedule() {
         });
     });
 
-    const thead = `<tr>
-        <th style="min-width:72px">Time</th>
-        ${DAY_FULL.map(d => `<th>${d}</th>`).join('')}
-    </tr>`;
+    // ── Column headers with date + CBU indicators ──
+    const headerCells = weekDates.map((date, di) => {
+        const ds      = toDateStr(date);
+        const isToday = ds === todayStr;
+        const dateLabel = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
+        // Find CBU / user calendar events that fall on this exact date (including range days)
+        const dayEvents = allCal.filter(e => {
+            if (e.date === ds) return true;
+            if (e.endDate) return ds >= e.date && ds <= e.endDate;
+            return false;
+        });
+
+        const badges = dayEvents.slice(0, 2).map(e => {
+            const label = e.label.length > 20 ? e.label.slice(0, 18) + '…' : e.label;
+            return `<div class="sched-day-badge cat-${esc(e.category)}">${esc(label)}</div>`;
+        }).join('');
+
+        return `<th class="${isToday ? 'sched-today-col' : ''}">
+            <div class="sched-day-name">${DAY_FULL[di]}</div>
+            <div class="sched-day-date">${dateLabel}</div>
+            ${badges}
+        </th>`;
+    }).join('');
+
+    // ── Table body ─────────────────────────────
     const tbody = TIMES.map((time, ti) => {
-        const cells = DAY_FULL.map((day, di) => {
+        const cells = weekDates.map((date, di) => {
             const info = coverage[di][ti];
 
-            // This row is interior to a rowspan block above — emit nothing
-            if (info && !info.isStart) return '';
+            if (info && !info.isStart) return '';   // interior of a rowspan
 
-            // First row of a course block — emit a spanning cell
             if (info && info.isStart) {
                 const { block } = info;
-                const meta = [
-                    `${block.displayStart}–${block.displayEnd}`,
-                    block.room,
-                ].filter(Boolean).join(' · ');
+                const meta = [`${block.displayStart}–${block.displayEnd}`, block.room]
+                    .filter(Boolean).join(' · ');
                 return `<td rowspan="${block.slots}" style="background:${block.bg};border-left:3px solid ${block.color};vertical-align:top;padding:10px 10px 8px;">
                     <div style="color:${block.color};font-size:11.5px;font-weight:700;letter-spacing:0.02em;line-height:1">${esc(block.code)}</div>
                     <div style="color:var(--text-1);font-size:12px;margin-top:4px;line-height:1.3">${esc(block.title)}</div>
@@ -638,8 +696,8 @@ function renderSchedule() {
                 </td>`;
             }
 
-            // Empty slot — editable by the user
-            const key = `${day}|${time}`;
+            // Empty slot — user events are keyed by day-of-week (repeat every week)
+            const key = `${DAY_FULL[di]}|${time}`;
             const events = (state.schedule[key] || []).filter(Boolean);
             const evHtml = events.map(e =>
                 `<div class="schedule-event ${editCls}"
@@ -654,7 +712,7 @@ function renderSchedule() {
     el.innerHTML = `
         <div class="schedule-wrapper">
             <table class="schedule-table">
-                <thead>${thead}</thead>
+                <thead><tr><th style="min-width:72px">Time</th>${headerCells}</tr></thead>
                 <tbody>${tbody}</tbody>
             </table>
         </div>`;
@@ -1294,7 +1352,12 @@ function bindEvents() {
         if (e.key === 'Enter') addProject();
     });
 
-    // Schedule
+    // Schedule navigation
+    document.getElementById('prevWeekBtn')?.addEventListener('click', () => { scheduleWeekOffset--; renderSchedule(); });
+    document.getElementById('nextWeekBtn')?.addEventListener('click', () => { scheduleWeekOffset++; renderSchedule(); });
+    document.getElementById('todayBtn')?.addEventListener('click',    () => { scheduleWeekOffset = 0; renderSchedule(); });
+
+    // Schedule edit
     document.getElementById('editScheduleBtn')?.addEventListener('click', toggleScheduleEdit);
     document.getElementById('closeScheduleModal')?.addEventListener('click',  () => closeModal('scheduleModal'));
     document.getElementById('cancelScheduleModal')?.addEventListener('click', () => closeModal('scheduleModal'));
