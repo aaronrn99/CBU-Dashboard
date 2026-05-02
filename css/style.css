@@ -10,7 +10,7 @@
     --bg-3: #21262d;
     --border: #30363d;
     --border-muted: #21262d;
-    --text-1: #e6edf3;
+    --text-1: #ffffff;
     --text-2: #8b949e;
     --text-3: #484f58;
     --accent: #58a6ff;
@@ -738,7 +738,7 @@ body {
 .note-content {
     font-size: 13px;
     line-height: 1.6;
-    color: var(--text-2);
+    color: #ffffff;
     background: transparent;
     border: none;
     resize: none;
@@ -1515,3 +1515,57 @@ body {
     .section-header { gap: 10px; }
     .section-header h2 { font-size: 17px; }
 }
+
+/* ═══════════════════════════════════════════
+   Emerald Green UI Text  (#3dba72)
+   Applies to: navigation, headings, labels
+   Body/card content stays #ffffff (--text-1)
+   Muted metadata (--text-2 / --text-3) unchanged
+   Welcome banner color cycle is NOT touched here
+   ═══════════════════════════════════════════ */
+
+/* ── Sidebar navigation ─────────────────── */
+.logo-title                           { color: #3dba72; }
+.nav-link                             { color: rgba(61, 186, 114, 0.55); }
+.nav-link:hover,
+.nav-link.active                      { color: #3dba72; }
+.hamburger                            { color: rgba(61, 186, 114, 0.55); }
+.hamburger:hover                      { color: #3dba72; }
+
+/* ── Topbar ─────────────────────────────── */
+.page-title                           { color: #3dba72; }
+
+/* ── Section & panel headings ───────────── */
+.section-header h2                    { color: #3dba72; }
+.section-header h3                    { color: #3dba72; }
+
+/* ── Modals ─────────────────────────────── */
+.modal-header h3                      { color: #3dba72; }
+
+/* ── Form labels ────────────────────────── */
+.form-group label                     { color: #3dba72; }
+
+/* ── Settings cards ─────────────────────── */
+.settings-card-header h3              { color: #3dba72; }
+.settings-help summary:hover          { color: #3dba72; }
+
+/* ── Schedule ───────────────────────────── */
+.schedule-week-range                  { color: #3dba72; }
+.schedule-table th                    { color: #3dba72; }
+.sched-day-date                       { color: #3dba72; }
+.sched-today-col .sched-day-name,
+.sched-today-col .sched-day-date      { color: #3dba72; }
+
+/* ── Calendar ───────────────────────────── */
+.cal-month-card-title                 { color: #3dba72; }
+.cal-grid-section-title               { color: #3dba72; }
+.cal-next-label, .cal-next-when       { color: #3dba72; }
+
+/* ── Files breadcrumb ───────────────────── */
+.files-bc-current                     { color: #3dba72; }
+.files-bc-link                        { color: #3dba72; }
+
+/* ── Thesis sub-navigation ──────────────── */
+.thesis-tab-btn                       { color: rgba(61, 186, 114, 0.55); }
+.thesis-tab-btn.active,
+.thesis-tab-btn:hover:not(.active)    { color: #3dba72; }
