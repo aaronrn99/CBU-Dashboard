@@ -165,6 +165,8 @@ const SECTION_TITLES = {
     notes:       'Notes',
     thesis:      'Thesis',
     calendar:    'Calendar',
+    files:       'Files',
+    settings:    'Settings',
 };
 
 function showSection(id) {
@@ -178,6 +180,9 @@ function showSection(id) {
 
     const titleEl = document.getElementById('pageTitle');
     if (titleEl) titleEl.textContent = SECTION_TITLES[id] || '';
+
+    if (id === 'files')    renderFiles();
+    if (id === 'settings') renderSettingsSection();
 }
 
 // ── Canvas API ───────────────────────────────
@@ -1321,6 +1326,273 @@ function gridDayClick(dateStr) {
     setTimeout(() => document.getElementById('calEventLabel').focus(), 60);
 }
 
+// ── Files & Dropbox ───────────────────────────
+
+let filesPathStack = [{ path: '', label: 'Dropbox' }];
+
+function getDropboxToken() { return load('dropboxToken', ''); }
+
+// POST to api.dropboxapi.com (JSON → JSON)
+async function dropboxAPI(endpoint, body = {}) {
+    const token = getDropboxToken();
+    if (!token) throw new Error('No Dropbox token — go to Settings to connect.');
+    const res = await fetch(`https://api.dropboxapi.com/2/${endpoint}`, {
+        method:  'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body:    JSON.stringify(body),
+    });
+    if (!res.ok) {
+        let msg = `Dropbox ${res.status}`;
+        try { const j = await res.json(); msg = j.error_summary || j.user_message || msg; } catch {}
+        throw new Error(msg);
+    }
+    return res.json();
+}
+
+// POST to content.dropboxapi.com — returns raw image blob for thumbnails
+async function dropboxThumbnail(path) {
+    const token = getDropboxToken();
+    const res = await fetch('https://content.dropboxapi.com/2/files/get_thumbnail', {
+        method:  'POST',
+        headers: {
+            'Authorization':   `Bearer ${token}`,
+            'Dropbox-API-Arg': JSON.stringify({ path, format: 'jpeg', size: 'w256h256', mode: 'strict' }),
+        },
+    });
+    if (!res.ok) return null;
+    return URL.createObjectURL(await res.blob());
+}
+
+async function dropboxTempLink(path) {
+    const data = await dropboxAPI('files/get_temporary_link', { path });
+    return data.link;
+}
+
+const FILE_ICONS = {
+    jpg:'🖼', jpeg:'🖼', png:'🖼', gif:'🖼', webp:'🖼', svg:'🖼', heic:'🖼',
+    pdf:'📄',
+    doc:'📝', docx:'📝', txt:'📝', rtf:'📝', md:'📝',
+    xls:'📊', xlsx:'📊', csv:'📊', numbers:'📊',
+    ppt:'📊', pptx:'📊', key:'📊',
+    ai:'🎨', psd:'🎨', indd:'🎨', sketch:'🎨', fig:'🎨', xd:'🎨',
+    dwg:'📐', dxf:'📐', rvt:'📐',
+    mp4:'🎬', mov:'🎬', avi:'🎬', mkv:'🎬',
+    mp3:'🎵', wav:'🎵', aac:'🎵',
+    zip:'📦', rar:'📦', '7z':'📦',
+};
+
+function fileTypeIcon(entry) {
+    if (entry['.tag'] === 'folder') return '📁';
+    const ext = (entry.name.split('.').pop() || '').toLowerCase();
+    return FILE_ICONS[ext] || '📄';
+}
+
+function isThumbable(name) { return /\.(jpg|jpeg|png|webp|gif)$/i.test(name); }
+
+// ── Render entry point ─────────────────────────
+function renderFiles() {
+    const noToken    = document.getElementById('filesNoToken');
+    const browser    = document.getElementById('filesBrowser');
+    const refreshBtn = document.getElementById('filesRefreshBtn');
+    const hasToken   = !!getDropboxToken();
+    if (noToken)    noToken.style.display    = hasToken ? 'none'  : 'block';
+    if (browser)    browser.style.display    = hasToken ? 'block' : 'none';
+    if (refreshBtn) refreshBtn.style.display = hasToken ? ''      : 'none';
+    if (hasToken) {
+        filesPathStack = [{ path: '', label: 'Dropbox' }];
+        loadFilesFolder('');
+    }
+}
+
+// ── Folder loading ─────────────────────────────
+async function loadFilesFolder(path) {
+    const grid = document.getElementById('filesGrid');
+    if (!grid) return;
+    grid.innerHTML = `<div class="files-loading">
+        <div class="files-loading-dots"><span></span><span></span><span></span></div>Loading…</div>`;
+    updateFilesBreadcrumb();
+    try {
+        const result = await dropboxAPI('files/list_folder', {
+            path, include_media_info: true, limit: 300,
+        });
+        renderFilesGrid(result.entries || []);
+    } catch (err) {
+        grid.innerHTML = `<div class="empty-state">
+            <div class="empty-state-icon">⚠</div>
+            <div class="empty-state-text">${esc(err.message)}</div>
+        </div>`;
+    }
+}
+
+// ── Grid rendering ────────────────────────────
+function renderFilesGrid(entries) {
+    const grid = document.getElementById('filesGrid');
+    if (!grid) return;
+    if (!entries.length) {
+        grid.innerHTML = `<div class="empty-state">
+            <div class="empty-state-icon">📁</div>
+            <div class="empty-state-text">This folder is empty.</div>
+        </div>`;
+        return;
+    }
+    const sorted = [...entries].sort((a, b) => {
+        const af = a['.tag'] === 'folder', bf = b['.tag'] === 'folder';
+        if (af !== bf) return af ? -1 : 1;
+        return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+    });
+
+    grid.innerHTML = sorted.map((entry, idx) => {
+        const isFolder = entry['.tag'] === 'folder';
+        const modified = entry.server_modified
+            ? new Date(entry.server_modified).toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' })
+            : '';
+        const meta = [modified, entry.size ? fmtFileSize(entry.size) : ''].filter(Boolean).join(' · ');
+        return `
+        <div class="files-card" data-idx="${idx}"
+             data-path="${esc(entry.path_lower || '')}"
+             data-name="${esc(entry.name)}"
+             data-folder="${isFolder ? '1' : ''}"
+             title="${esc(entry.name)}">
+            <div class="files-card-preview">${fileTypeIcon(entry)}</div>
+            <div class="files-card-info">
+                <div class="files-card-name">${esc(entry.name)}</div>
+                <div class="files-card-meta">${meta}</div>
+            </div>
+        </div>`;
+    }).join('');
+
+    // Event delegation — handles all card clicks safely without inline handlers
+    grid.onclick = null;  // remove any previous handler before re-attaching
+    grid.addEventListener('click', filesGridClick, { once: true });
+
+    // Async thumbnails for images
+    sorted.forEach((entry, idx) => {
+        if (isThumbable(entry.name) && entry.path_lower) loadThumbnailCard(entry.path_lower, idx);
+    });
+}
+
+function filesGridClick(e) {
+    const card = e.target.closest('.files-card');
+    if (!card) return;
+    const path  = card.dataset.path;
+    const name  = card.dataset.name;
+    if (card.dataset.folder) {
+        filesPathStack.push({ path, label: name });
+        loadFilesFolder(path);
+    } else {
+        openDropboxFile(path, name);
+    }
+}
+
+// ── Thumbnail loading ─────────────────────────
+async function loadThumbnailCard(path, idx) {
+    const grid = document.getElementById('filesGrid');
+    if (!grid) return;
+    const preview = grid.querySelector(`[data-idx="${idx}"] .files-card-preview`);
+    if (!preview) return;
+    try {
+        const url = await dropboxThumbnail(path);
+        if (url && preview.isConnected) {
+            preview.innerHTML =
+                `<img src="${url}" alt="" class="files-card-thumb"
+                    onerror="this.parentNode.textContent='🖼'">`;
+        }
+    } catch { /* keep icon */ }
+}
+
+// ── Breadcrumb ────────────────────────────────
+function updateFilesBreadcrumb() {
+    const el = document.getElementById('filesBreadcrumb');
+    if (!el) return;
+    el.innerHTML = filesPathStack.map((bc, i) => {
+        const isLast = i === filesPathStack.length - 1;
+        const label  = i === 0 ? `☁ ${bc.label}` : esc(bc.label);
+        if (isLast) return `<span class="files-bc-item files-bc-current">${label}</span>`;
+        return `<span class="files-bc-item files-bc-link" data-bc-idx="${i}">${label}</span>`
+             + `<span class="files-bc-sep">›</span>`;
+    }).join('');
+
+    // Delegate breadcrumb clicks
+    el.onclick = null;
+    el.addEventListener('click', e => {
+        const item = e.target.closest('.files-bc-link');
+        if (!item) return;
+        const idx = +item.dataset.bcIdx;
+        filesPathStack = filesPathStack.slice(0, idx + 1);
+        loadFilesFolder(filesPathStack[idx].path);
+    }, { once: true });
+}
+
+// ── Open file ─────────────────────────────────
+async function openDropboxFile(path, name) {
+    const grid = document.getElementById('filesGrid');
+    const showErr = msg => {
+        if (!grid) return;
+        const t = document.createElement('div');
+        t.className = 'files-error-toast';
+        t.textContent = `⚠ Could not open "${name}": ${msg}`;
+        grid.prepend(t);
+        setTimeout(() => t.remove(), 5000);
+    };
+    try {
+        const link = await dropboxTempLink(path);
+        window.open(link, '_blank', 'noopener');
+    } catch (err) { showErr(err.message); }
+}
+
+// ── Settings ──────────────────────────────────
+
+function renderSettingsSection() {
+    const input = document.getElementById('dropboxTokenInput');
+    const dot   = document.getElementById('dropboxDot');
+    const token = getDropboxToken();
+    if (input) {
+        input.value       = '';
+        input.placeholder = token ? 'Token saved — paste new token to replace' : 'Paste your Dropbox access token';
+    }
+    if (dot) dot.className = `settings-status-dot${token ? ' connected' : ''}`;
+    setDropboxStatus(token ? 'saved' : '', token ? '✓ Token saved' : '');
+}
+
+function setDropboxStatus(cls, msg) {
+    const el  = document.getElementById('dropboxStatusMsg');
+    const dot = document.getElementById('dropboxDot');
+    if (el)  { el.className = `settings-status${cls ? ' settings-status-' + cls : ''}`; el.textContent = msg; }
+    if (dot) { dot.className = `settings-status-dot${cls === 'success' || cls === 'saved' ? ' connected' : cls === 'error' ? ' error' : ''}`; }
+}
+
+async function saveDropboxToken() {
+    const input = document.getElementById('dropboxTokenInput');
+    const raw   = input?.value?.trim();
+    if (!raw) { setDropboxStatus('error', '⚠ Paste a token above first.'); return; }
+    save('dropboxToken', raw);
+    if (input) { input.value = ''; input.placeholder = 'Token saved — paste new token to replace'; }
+    setDropboxStatus('saved', '✓ Token saved. Testing connection…');
+    await testDropboxConnection();
+}
+
+async function testDropboxConnection() {
+    setDropboxStatus('loading', 'Connecting to Dropbox…');
+    try {
+        const token = getDropboxToken();
+        if (!token) throw new Error('No token saved.');
+        const res = await fetch('https://api.dropboxapi.com/2/users/get_current_account', {
+            method:  'POST',
+            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body:    'null',
+        });
+        if (!res.ok) {
+            const j = await res.json().catch(() => ({}));
+            throw new Error(j.error_summary || `Status ${res.status}`);
+        }
+        const user = await res.json();
+        const name = user.name?.display_name || user.email || 'your account';
+        setDropboxStatus('success', `✓ Connected as ${name}`);
+    } catch (err) {
+        setDropboxStatus('error', `⚠ ${err.message}`);
+    }
+}
+
 // ── Modals ────────────────────────────────────
 function openModal(id) {
     document.getElementById(id)?.classList.add('open');
@@ -1428,6 +1700,25 @@ function bindEvents() {
         const file = e.target.files[0];
         if (file) handlePdfUpload(file);
         e.target.value = '';  // reset so the same file can be re-uploaded
+    });
+
+    // Files
+    document.getElementById('filesRefreshBtn')?.addEventListener('click', () => {
+        loadFilesFolder(filesPathStack[filesPathStack.length - 1].path);
+    });
+
+    // Settings — Dropbox
+    document.getElementById('saveDropboxTokenBtn')?.addEventListener('click', saveDropboxToken);
+    document.getElementById('testDropboxBtn')?.addEventListener('click', testDropboxConnection);
+    document.getElementById('dropboxTokenInput')?.addEventListener('keydown', e => {
+        if (e.key === 'Enter') saveDropboxToken();
+    });
+
+    // Settings — Canvas (opens existing modal)
+    document.getElementById('settingsCanvasBtn')?.addEventListener('click', () => {
+        document.getElementById('canvasUrl').value   = state.canvasSettings.url;
+        document.getElementById('canvasToken').value = state.canvasSettings.token;
+        openModal('canvasModal');
     });
 
     // Calendar

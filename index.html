@@ -63,6 +63,16 @@
                     <span class="nav-icon">🎓</span> Thesis
                 </a>
             </li>
+            <li>
+                <a href="#files" class="nav-link" data-section="files">
+                    <span class="nav-icon">☁</span> Files
+                </a>
+            </li>
+            <li>
+                <a href="#settings" class="nav-link" data-section="settings">
+                    <span class="nav-icon">⚙</span> Settings
+                </a>
+            </li>
         </ul>
         <div class="sidebar-footer">
             <button class="btn btn-ghost full-width" id="canvasSettingsBtn">⚙ Canvas Settings</button>
@@ -202,6 +212,86 @@
                     </div>
                     <div id="thesisPdfsList"></div>
                     <p class="form-hint" style="margin-top:16px">PDFs are stored in your browser's IndexedDB and persist between sessions on this device.</p>
+                </div>
+            </section>
+
+            <!-- Files -->
+            <section id="files" class="section">
+                <div class="section-header">
+                    <h2>Files</h2>
+                    <button class="btn btn-ghost" id="filesRefreshBtn" style="display:none">↻ Refresh</button>
+                </div>
+
+                <!-- No token: empty state + suggested folder structure -->
+                <div id="filesNoToken">
+                    <div class="empty-state">
+                        <div class="empty-state-icon">☁</div>
+                        <div class="empty-state-text">Connect your Dropbox to browse files from the dashboard.</div>
+                        <button class="btn btn-primary" style="margin-top:14px" onclick="showSection('settings')">Connect Dropbox</button>
+                    </div>
+                    <div class="files-suggested">
+                        <div class="files-suggested-title">Suggested folder structure for CBU Architecture</div>
+                        <div class="files-suggested-grid">
+                            <div class="files-suggested-folder"><span>📁</span><span>CBU</span></div>
+                            <div class="files-suggested-folder files-suggested-child"><span>📁</span><span>Studio III</span></div>
+                            <div class="files-suggested-folder files-suggested-child"><span>📁</span><span>Thesis</span></div>
+                            <div class="files-suggested-folder files-suggested-child"><span>📁</span><span>Theory</span></div>
+                            <div class="files-suggested-folder files-suggested-child"><span>📁</span><span>References</span></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Token set: Dropbox file browser -->
+                <div id="filesBrowser" style="display:none">
+                    <div class="files-breadcrumb" id="filesBreadcrumb"></div>
+                    <div class="files-grid" id="filesGrid"></div>
+                </div>
+            </section>
+
+            <!-- Settings -->
+            <section id="settings" class="section">
+                <div class="section-header">
+                    <h2>Settings</h2>
+                </div>
+
+                <!-- Dropbox card -->
+                <div class="settings-card">
+                    <div class="settings-card-header">
+                        <h3>Dropbox</h3>
+                        <span class="settings-status-dot" id="dropboxDot"></span>
+                    </div>
+                    <p class="settings-description">Connect Dropbox to browse, preview, and open your architecture files directly from the Files tab.</p>
+                    <div class="form-group" style="max-width:480px">
+                        <label for="dropboxTokenInput">Access Token</label>
+                        <input type="password" id="dropboxTokenInput" class="input-field" placeholder="Paste your Dropbox access token">
+                    </div>
+                    <div class="settings-actions">
+                        <button class="btn btn-primary" id="saveDropboxTokenBtn">Save Token</button>
+                        <button class="btn btn-ghost"   id="testDropboxBtn">Test Connection</button>
+                    </div>
+                    <div class="settings-status" id="dropboxStatusMsg"></div>
+                    <details class="settings-help">
+                        <summary>How to get your access token</summary>
+                        <ol>
+                            <li>Go to <a href="https://www.dropbox.com/developers/apps" target="_blank" rel="noopener">dropbox.com/developers/apps</a></li>
+                            <li>Click <strong>Create App</strong></li>
+                            <li>Choose <strong>Scoped access</strong> → <strong>Full Dropbox</strong></li>
+                            <li>Name the app and click <strong>Create App</strong></li>
+                            <li>On the app page, open the <strong>Settings</strong> tab and scroll to <strong>OAuth 2</strong></li>
+                            <li>Under <strong>Generated access token</strong>, click <strong>Generate</strong></li>
+                            <li>Copy the token and paste it above</li>
+                        </ol>
+                        <p class="form-hint" style="margin-top:8px">Your token is stored only in this browser's <code>localStorage</code> and is sent only to Dropbox's servers.</p>
+                    </details>
+                </div>
+
+                <!-- Canvas API card -->
+                <div class="settings-card">
+                    <div class="settings-card-header">
+                        <h3>Canvas LMS</h3>
+                    </div>
+                    <p class="settings-description">Sync assignments from your Canvas courses on the Assignments tab.</p>
+                    <button class="btn btn-ghost" id="settingsCanvasBtn">Open Canvas Settings →</button>
                 </div>
             </section>
 
