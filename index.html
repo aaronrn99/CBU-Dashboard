@@ -46,6 +46,11 @@
                 </a>
             </li>
             <li>
+                <a href="#calendar" class="nav-link" data-section="calendar">
+                    <span class="nav-icon">🗓</span> Calendar
+                </a>
+            </li>
+            <li>
                 <a href="#notes" class="nav-link" data-section="notes">
                     <span class="nav-icon">📝</span> Notes
                 </a>
@@ -121,6 +126,23 @@
                     <button class="btn btn-ghost" id="editScheduleBtn">Edit</button>
                 </div>
                 <div id="scheduleGrid"></div>
+            </section>
+
+            <!-- Calendar -->
+            <section id="calendar" class="section">
+                <div class="section-header">
+                    <h2>Academic Calendar</h2>
+                    <button class="btn btn-primary" id="addCalEventBtn">+ Add Event</button>
+                </div>
+                <div class="cal-next-banner" id="calNextBanner" style="display:none" aria-live="polite"></div>
+                <div class="cal-legend" aria-label="Color legend">
+                    <span class="cal-legend-item"><span class="cal-dot dot-semester"></span>Semester</span>
+                    <span class="cal-legend-item"><span class="cal-dot dot-holiday"></span>Holiday</span>
+                    <span class="cal-legend-item"><span class="cal-dot dot-deadline"></span>Deadline</span>
+                    <span class="cal-legend-item"><span class="cal-dot dot-architecture"></span>Architecture</span>
+                    <span class="cal-legend-item"><span class="cal-dot dot-personal"></span>Personal</span>
+                </div>
+                <div id="calendarList"></div>
             </section>
 
             <!-- Notes -->
@@ -258,6 +280,44 @@
                 <button class="btn btn-danger" id="clearScheduleSlot">Clear Slot</button>
                 <button class="btn btn-ghost" id="cancelScheduleModal">Cancel</button>
                 <button class="btn btn-primary" id="saveScheduleSlot">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Calendar: Add Event Modal -->
+    <div class="modal-overlay" id="calEventModal" role="dialog" aria-modal="true" aria-labelledby="calEventModalTitle">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="calEventModalTitle">Add Calendar Event</h3>
+                <button class="modal-close" id="closeCalEventModal" aria-label="Close">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="calEventLabel">Event Label</label>
+                    <input type="text" id="calEventLabel" class="input-field" placeholder="e.g. Portfolio Review">
+                </div>
+                <div class="form-group">
+                    <label for="calEventDate">Date</label>
+                    <input type="date" id="calEventDate" class="input-field">
+                </div>
+                <div class="form-group">
+                    <label for="calEventEndDate">End Date <span style="color:var(--text-3);font-weight:400">(optional — for multi-day events)</span></label>
+                    <input type="date" id="calEventEndDate" class="input-field">
+                </div>
+                <div class="form-group">
+                    <label for="calEventCategory">Category</label>
+                    <select id="calEventCategory" class="select-field" style="width:100%">
+                        <option value="semester">Semester Date</option>
+                        <option value="holiday">Holiday</option>
+                        <option value="deadline">Deadline</option>
+                        <option value="architecture">Architecture</option>
+                        <option value="personal" selected>Personal</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-ghost" id="cancelCalEventModal">Cancel</button>
+                <button class="btn btn-primary" id="saveCalEventBtn">Add Event</button>
             </div>
         </div>
     </div>

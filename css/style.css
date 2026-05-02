@@ -895,6 +895,131 @@ body {
 
 .pdf-actions { display: flex; gap: 6px; flex-shrink: 0; align-items: center; }
 
+/* ── Academic Calendar ──────────────────── */
+.cal-next-banner {
+    align-items: center;
+    gap: 8px;
+    background: var(--accent-dim);
+    border: 1px solid rgba(88, 166, 255, 0.22);
+    border-radius: var(--radius);
+    padding: 10px 14px;
+    margin-bottom: 18px;
+    font-size: 13px;
+    color: var(--text-1);
+}
+
+.cal-next-label { font-weight: 700; color: var(--accent); }
+
+.cal-next-when {
+    margin-left: auto;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--accent);
+}
+
+.cal-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    padding: 11px 14px;
+    margin-bottom: 22px;
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+}
+
+.cal-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-2);
+}
+
+.cal-group { margin-bottom: 22px; }
+
+.cal-month-header {
+    font-size: 10.5px;
+    font-weight: 700;
+    color: var(--text-2);
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+    padding-bottom: 8px;
+    margin-bottom: 7px;
+    border-bottom: 1px solid var(--border-muted);
+}
+
+.cal-event-row {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    padding: 10px 13px;
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 5px;
+    transition: border-color var(--ease);
+}
+.cal-event-row:hover { border-color: var(--text-3); }
+.cal-event-row.cal-past { opacity: 0.4; }
+
+.cal-date {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-2);
+    min-width: 90px;
+    flex-shrink: 0;
+    font-variant-numeric: tabular-nums;
+}
+
+.cal-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+.dot-semester     { background: var(--accent); }
+.dot-holiday      { background: var(--red); }
+.dot-deadline     { background: var(--yellow); }
+.dot-architecture { background: var(--purple); }
+.dot-personal     { background: #39c5bb; }
+
+.cal-label {
+    flex: 1;
+    font-size: 13.5px;
+    font-weight: 500;
+    min-width: 0;
+}
+
+.cal-cat-badge {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 20px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+.cat-semester     { background: var(--accent-dim);         color: var(--accent); }
+.cat-holiday      { background: var(--red-dim);            color: var(--red); }
+.cat-deadline     { background: var(--yellow-dim);         color: var(--yellow); }
+.cat-architecture { background: rgba(163,113,247,0.12);    color: var(--purple); }
+.cat-personal     { background: rgba(57,197,187,0.12);     color: #39c5bb; }
+
+.cal-countdown {
+    font-size: 11px;
+    font-weight: 600;
+    min-width: 70px;
+    text-align: right;
+    flex-shrink: 0;
+}
+.countdown-today    { color: var(--accent); }
+.countdown-soon     { color: var(--yellow); }
+.countdown-upcoming { color: var(--text-2); }
+.countdown-past     { color: var(--text-3); }
+
 /* ── Responsive ────────────────────────── */
 @media (max-width: 768px) {
     .sidebar {
@@ -917,6 +1042,11 @@ body {
 
     .assignment-card { flex-direction: column; gap: 10px; }
     .assignment-actions { align-self: flex-start; }
+
+    .cal-event-row { flex-wrap: wrap; row-gap: 6px; }
+    .cal-countdown { text-align: left; min-width: auto; }
+    .cal-date { min-width: 72px; }
+    .cal-next-banner { flex-wrap: wrap; }
 }
 
 @media (max-width: 480px) {

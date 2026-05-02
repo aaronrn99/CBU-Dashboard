@@ -12,6 +12,7 @@ const state = {
     canvasSettings: { url: '', token: '' },
     assignments: [],
     thesis: { notes: [], links: [], pdfs: [] },
+    calendarEvents: [],
 };
 
 // ── Persistence ───────────────────────────────
@@ -66,6 +67,8 @@ function init() {
     renderThesisNotes();
     renderThesisLinks();
     renderThesisPdfs();
+    state.calendarEvents = load('calendarEvents', []);
+    renderCalendar();
     bindEvents();
 }
 
@@ -87,6 +90,7 @@ const SECTION_TITLES = {
     schedule:    'Weekly Schedule',
     notes:       'Notes',
     thesis:      'Thesis',
+    calendar:    'Calendar',
 };
 
 function showSection(id) {
@@ -935,6 +939,161 @@ function renderThesisPdfs() {
     ).join('');
 }
 
+// ── Calendar ──────────────────────────────────
+
+const CBU_FALL_2026 = [
+    // Semester dates — blue
+    { id: 'cbu-classes-begin',   date: '2026-09-08',                   label: 'Classes Begin',                    category: 'semester',     builtin: true },
+    { id: 'cbu-add-deadline',    date: '2026-09-15',                   label: 'Last Day to Add a Class',          category: 'deadline',     builtin: true },
+    { id: 'cbu-drop-deadline',   date: '2026-09-22',                   label: 'Last Day to Drop with Refund',     category: 'deadline',     builtin: true },
+    { id: 'cbu-withdraw',        date: '2026-11-09',                   label: 'Last Day to Withdraw (W grade)',   category: 'deadline',     builtin: true },
+    { id: 'cbu-resume',          date: '2026-12-01',                   label: 'Classes Resume',                   category: 'semester',     builtin: true },
+    { id: 'cbu-finals',          date: '2026-12-07', endDate: '2026-12-11', label: 'Final Examinations',         category: 'semester',     builtin: true },
+    { id: 'cbu-closes',          date: '2026-12-11',                   label: 'Semester Closes',                  category: 'semester',     builtin: true },
+    // Holidays — red
+    { id: 'cbu-labor-day',       date: '2026-09-07',                   label: 'Labor Day (No Classes)',           category: 'holiday',      builtin: true },
+    { id: 'cbu-thanksgiving',    date: '2026-11-25', endDate: '2026-11-27', label: 'Thanksgiving Break (No Classes)', category: 'holiday', builtin: true },
+    // Architecture specific — purple
+    { id: 'cbu-midterm-reviews', date: '2026-10-15',                   label: 'Midterm Reviews (est.)',            category: 'architecture', builtin: true },
+    { id: 'cbu-final-reviews',   date: '2026-11-20',                   label: 'Final Studio Reviews (est.)',       category: 'architecture', builtin: true },
+];
+
+const CAL_CAT_LABELS = {
+    semester:     'Semester',
+    holiday:      'Holiday',
+    deadline:     'Deadline',
+    architecture: 'Architecture',
+    personal:     'Personal',
+};
+
+function formatCalDate(dateStr, endDateStr) {
+    const start = new Date(dateStr + 'T12:00:00');
+    const opts  = { month: 'short', day: 'numeric' };
+    if (!endDateStr) return start.toLocaleDateString('en-US', opts);
+    const end = new Date(endDateStr + 'T12:00:00');
+    if (start.getMonth() === end.getMonth()) {
+        return `${start.toLocaleDateString('en-US', opts)} – ${end.getDate()}`;
+    }
+    return `${start.toLocaleDateString('en-US', opts)} – ${end.toLocaleDateString('en-US', opts)}`;
+}
+
+function calDaysUntil(dateStr, endDateStr) {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const start = new Date(dateStr + 'T00:00:00');
+    const end   = endDateStr ? new Date(endDateStr + 'T00:00:00') : start;
+    if (today >= start && today <= end) return { text: 'Ongoing',         cls: 'countdown-today' };
+    const diff = Math.round((start - today) / 86400000);
+    if (diff > 0) {
+        if (diff === 1)  return { text: 'Tomorrow',      cls: 'countdown-soon' };
+        if (diff <= 14)  return { text: `In ${diff}d`,   cls: 'countdown-soon' };
+        return                  { text: `In ${diff}d`,   cls: 'countdown-upcoming' };
+    }
+    const ago = Math.round((today - end) / 86400000);
+    return { text: `${ago}d ago`, cls: 'countdown-past' };
+}
+
+function groupCalByMonth(events) {
+    const groups = new Map();
+    const sorted = [...events].sort((a, b) => {
+        const cmp = a.date.localeCompare(b.date);
+        if (cmp !== 0) return cmp;
+        return (a.builtin ? 0 : 1) - (b.builtin ? 0 : 1);
+    });
+    sorted.forEach(e => {
+        const d   = new Date(e.date + 'T12:00:00');
+        const key = `${d.getFullYear()}-${String(d.getMonth()).padStart(2, '0')}`;
+        if (!groups.has(key)) {
+            groups.set(key, {
+                label:  d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+                events: [],
+            });
+        }
+        groups.get(key).events.push(e);
+    });
+    return [...groups.values()];
+}
+
+function renderCalendar() {
+    const el = document.getElementById('calendarList');
+    if (!el) return;
+
+    const all    = [...CBU_FALL_2026, ...state.calendarEvents];
+    const groups = groupCalByMonth(all);
+
+    // "Next upcoming" banner
+    const today  = new Date(); today.setHours(0, 0, 0, 0);
+    const next   = all
+        .filter(e => new Date(e.date + 'T00:00:00') >= today)
+        .sort((a, b) => a.date.localeCompare(b.date))[0];
+    const banner = document.getElementById('calNextBanner');
+    if (banner) {
+        if (next) {
+            const { text } = calDaysUntil(next.date, next.endDate);
+            banner.innerHTML =
+                `<span class="cal-next-label">Next:</span> ${esc(next.label)} <span class="cal-next-when">${text}</span>`;
+            banner.style.display = 'flex';
+        } else {
+            banner.style.display = 'none';
+        }
+    }
+
+    if (!groups.length) {
+        el.innerHTML = `<div class="empty-state">
+            <div class="empty-state-icon">🗓</div>
+            <div class="empty-state-text">No events on the calendar.</div>
+        </div>`;
+        return;
+    }
+
+    el.innerHTML = groups.map(g => `
+        <div class="cal-group">
+            <div class="cal-month-header">${g.label}</div>
+            ${g.events.map(e => {
+                const cd     = calDaysUntil(e.date, e.endDate);
+                const isPast = cd.cls === 'countdown-past';
+                const cat    = esc(e.category);
+                return `
+                <div class="cal-event-row${isPast ? ' cal-past' : ''}">
+                    <span class="cal-date">${formatCalDate(e.date, e.endDate)}</span>
+                    <span class="cal-dot dot-${cat}"></span>
+                    <span class="cal-label">${esc(e.label)}</span>
+                    <span class="cal-cat-badge cat-${cat}">${esc(CAL_CAT_LABELS[e.category] || e.category)}</span>
+                    <span class="cal-countdown ${cd.cls}">${cd.text}</span>
+                    ${!e.builtin
+                        ? `<button class="btn btn-danger" onclick="deleteCalendarEvent(${e.id})" aria-label="Delete event">✕</button>`
+                        : `<span style="width:32px;flex-shrink:0"></span>`}
+                </div>`;
+            }).join('')}
+        </div>`
+    ).join('');
+}
+
+function addCalendarEvent() {
+    const label    = document.getElementById('calEventLabel').value.trim();
+    const date     = document.getElementById('calEventDate').value;
+    const endDate  = document.getElementById('calEventEndDate').value || null;
+    const category = document.getElementById('calEventCategory').value;
+    if (!label || !date) return;
+    if (endDate && endDate < date) {
+        alert('End date must be on or after the start date.');
+        return;
+    }
+    state.calendarEvents.push({ id: Date.now(), label, date, endDate, category, builtin: false });
+    save('calendarEvents', state.calendarEvents);
+    closeModal('calEventModal');
+    document.getElementById('calEventLabel').value    = '';
+    document.getElementById('calEventDate').value     = '';
+    document.getElementById('calEventEndDate').value  = '';
+    document.getElementById('calEventCategory').value = 'personal';
+    renderCalendar();
+}
+
+function deleteCalendarEvent(id) {
+    state.calendarEvents = state.calendarEvents.filter(e => e.id !== id);
+    save('calendarEvents', state.calendarEvents);
+    renderCalendar();
+}
+
 // ── Modals ────────────────────────────────────
 function openModal(id) {
     document.getElementById(id)?.classList.add('open');
@@ -1039,8 +1198,24 @@ function bindEvents() {
         e.target.value = '';  // reset so the same file can be re-uploaded
     });
 
+    // Calendar
+    document.getElementById('addCalEventBtn')?.addEventListener('click', () => {
+        document.getElementById('calEventLabel').value    = '';
+        document.getElementById('calEventDate').value     = '';
+        document.getElementById('calEventEndDate').value  = '';
+        document.getElementById('calEventCategory').value = 'personal';
+        openModal('calEventModal');
+        setTimeout(() => document.getElementById('calEventLabel').focus(), 60);
+    });
+    document.getElementById('closeCalEventModal')?.addEventListener('click',  () => closeModal('calEventModal'));
+    document.getElementById('cancelCalEventModal')?.addEventListener('click', () => closeModal('calEventModal'));
+    document.getElementById('saveCalEventBtn')?.addEventListener('click', addCalendarEvent);
+    document.getElementById('calEventLabel')?.addEventListener('keydown', e => {
+        if (e.key === 'Enter') document.getElementById('calEventDate')?.focus();
+    });
+
     // Close modals on backdrop click
-    ['canvasModal', 'projectModal', 'scheduleModal', 'thesisLinkModal'].forEach(id => {
+    ['canvasModal', 'projectModal', 'scheduleModal', 'thesisLinkModal', 'calEventModal'].forEach(id => {
         document.getElementById(id)?.addEventListener('click', e => {
             if (e.target === document.getElementById(id)) closeModal(id);
         });
@@ -1049,7 +1224,7 @@ function bindEvents() {
     // Close modals on Escape key
     document.addEventListener('keydown', e => {
         if (e.key === 'Escape') {
-            ['canvasModal', 'projectModal', 'scheduleModal', 'thesisLinkModal'].forEach(id => {
+            ['canvasModal', 'projectModal', 'scheduleModal', 'thesisLinkModal', 'calEventModal'].forEach(id => {
                 if (document.getElementById(id)?.classList.contains('open')) closeModal(id);
             });
         }
