@@ -136,13 +136,17 @@
                 </div>
                 <div class="cal-next-banner" id="calNextBanner" style="display:none" aria-live="polite"></div>
                 <div class="cal-legend" aria-label="Color legend">
-                    <span class="cal-legend-item"><span class="cal-dot dot-semester"></span>Semester</span>
+                    <span class="cal-legend-item"><span class="cal-dot dot-milestone"></span>Milestone</span>
                     <span class="cal-legend-item"><span class="cal-dot dot-holiday"></span>Holiday</span>
                     <span class="cal-legend-item"><span class="cal-dot dot-deadline"></span>Deadline</span>
                     <span class="cal-legend-item"><span class="cal-dot dot-architecture"></span>Architecture</span>
                     <span class="cal-legend-item"><span class="cal-dot dot-personal"></span>Personal</span>
                 </div>
                 <div id="calendarList"></div>
+                <div class="cal-grid-divider">
+                    <div class="cal-grid-section-title">Fall 2026 — Monthly View</div>
+                    <div class="cal-months-grid" id="calGridContainer"></div>
+                </div>
             </section>
 
             <!-- Notes -->
@@ -307,7 +311,7 @@
                 <div class="form-group">
                     <label for="calEventCategory">Category</label>
                     <select id="calEventCategory" class="select-field" style="width:100%">
-                        <option value="semester">Semester Date</option>
+                        <option value="milestone">Milestone</option>
                         <option value="holiday">Holiday</option>
                         <option value="deadline">Deadline</option>
                         <option value="architecture">Architecture</option>

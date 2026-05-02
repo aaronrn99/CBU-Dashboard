@@ -942,24 +942,22 @@ function renderThesisPdfs() {
 // ── Calendar ──────────────────────────────────
 
 const CBU_FALL_2026 = [
-    // Semester dates — blue
-    { id: 'cbu-classes-begin',   date: '2026-09-08',                   label: 'Classes Begin',                    category: 'semester',     builtin: true },
-    { id: 'cbu-add-deadline',    date: '2026-09-15',                   label: 'Last Day to Add a Class',          category: 'deadline',     builtin: true },
-    { id: 'cbu-drop-deadline',   date: '2026-09-22',                   label: 'Last Day to Drop with Refund',     category: 'deadline',     builtin: true },
-    { id: 'cbu-withdraw',        date: '2026-11-09',                   label: 'Last Day to Withdraw (W grade)',   category: 'deadline',     builtin: true },
-    { id: 'cbu-resume',          date: '2026-12-01',                   label: 'Classes Resume',                   category: 'semester',     builtin: true },
-    { id: 'cbu-finals',          date: '2026-12-07', endDate: '2026-12-11', label: 'Final Examinations',         category: 'semester',     builtin: true },
-    { id: 'cbu-closes',          date: '2026-12-11',                   label: 'Semester Closes',                  category: 'semester',     builtin: true },
+    // Milestones — blue
+    { id: 'cbu-classes-begin', date: '2026-09-08',                        label: 'Classes Begin',                  category: 'milestone', builtin: true },
+    { id: 'cbu-resume',        date: '2026-12-01',                        label: 'Classes Resume',                 category: 'milestone', builtin: true },
+    { id: 'cbu-closes',        date: '2026-12-11',                        label: 'Semester Closes',                category: 'milestone', builtin: true },
+    // Deadlines — amber
+    { id: 'cbu-add-deadline',  date: '2026-09-15',                        label: 'Last Day to Add a Class',        category: 'deadline',  builtin: true },
+    { id: 'cbu-drop-deadline', date: '2026-09-22',                        label: 'Last Day to Drop with Refund',   category: 'deadline',  builtin: true },
+    { id: 'cbu-withdraw',      date: '2026-11-09',                        label: 'Last Day to Withdraw (W grade)', category: 'deadline',  builtin: true },
+    { id: 'cbu-finals',        date: '2026-12-07', endDate: '2026-12-11', label: 'Final Examinations',             category: 'deadline',  builtin: true },
     // Holidays — red
-    { id: 'cbu-labor-day',       date: '2026-09-07',                   label: 'Labor Day (No Classes)',           category: 'holiday',      builtin: true },
-    { id: 'cbu-thanksgiving',    date: '2026-11-25', endDate: '2026-11-27', label: 'Thanksgiving Break (No Classes)', category: 'holiday', builtin: true },
-    // Architecture specific — purple
-    { id: 'cbu-midterm-reviews', date: '2026-10-15',                   label: 'Midterm Reviews (est.)',            category: 'architecture', builtin: true },
-    { id: 'cbu-final-reviews',   date: '2026-11-20',                   label: 'Final Studio Reviews (est.)',       category: 'architecture', builtin: true },
+    { id: 'cbu-labor-day',     date: '2026-09-07',                        label: 'Labor Day (No Classes)',         category: 'holiday',   builtin: true },
+    { id: 'cbu-thanksgiving',  date: '2026-11-25', endDate: '2026-11-27', label: 'Thanksgiving Break (No Classes)',category: 'holiday',   builtin: true },
 ];
 
 const CAL_CAT_LABELS = {
-    semester:     'Semester',
+    milestone:    'Milestone',
     holiday:      'Holiday',
     deadline:     'Deadline',
     architecture: 'Architecture',
@@ -1042,6 +1040,7 @@ function renderCalendar() {
             <div class="empty-state-icon">🗓</div>
             <div class="empty-state-text">No events on the calendar.</div>
         </div>`;
+        renderCalGrid();
         return;
     }
 
@@ -1066,6 +1065,8 @@ function renderCalendar() {
             }).join('')}
         </div>`
     ).join('');
+
+    renderCalGrid();
 }
 
 function addCalendarEvent() {
@@ -1092,6 +1093,100 @@ function deleteCalendarEvent(id) {
     state.calendarEvents = state.calendarEvents.filter(e => e.id !== id);
     save('calendarEvents', state.calendarEvents);
     renderCalendar();
+}
+
+// ── Calendar Grid ─────────────────────────────
+
+const CAL_GRID_MONTHS = [
+    { year: 2026, month: 8  },  // September
+    { year: 2026, month: 9  },  // October
+    { year: 2026, month: 10 },  // November
+    { year: 2026, month: 11 },  // December
+];
+
+const DOW_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+
+// Build a map from dateStr → [events] expanding multi-day ranges
+function buildDayEventMap() {
+    const all = [...CBU_FALL_2026, ...state.calendarEvents];
+    const map = {};
+    all.forEach(e => {
+        const add = ds => { (map[ds] = map[ds] || []).push(e); };
+        add(e.date);
+        if (e.endDate) {
+            const cur = new Date(e.date + 'T12:00:00');
+            const end = new Date(e.endDate + 'T12:00:00');
+            cur.setDate(cur.getDate() + 1);
+            while (cur <= end) {
+                add(cur.toISOString().slice(0, 10));
+                cur.setDate(cur.getDate() + 1);
+            }
+        }
+    });
+    return map;
+}
+
+function renderCalGrid() {
+    const el = document.getElementById('calGridContainer');
+    if (!el) return;
+
+    const dayMap   = buildDayEventMap();
+    const now      = new Date(); now.setHours(0, 0, 0, 0);
+    const todayStr = now.toISOString().slice(0, 10);
+
+    el.innerHTML = CAL_GRID_MONTHS.map(({ year, month }) => {
+        const monthLabel     = new Date(year, month, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+        const firstDayOfWeek = new Date(year, month, 1).getDay();
+        const daysInMonth    = new Date(year, month + 1, 0).getDate();
+
+        const cells = [];
+
+        // Blank cells before the 1st
+        for (let i = 0; i < firstDayOfWeek; i++) {
+            cells.push('<div class="cal-day cal-day-empty"></div>');
+        }
+
+        for (let d = 1; d <= daysInMonth; d++) {
+            const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+            const events  = dayMap[dateStr] || [];
+            const isToday = dateStr === todayStr;
+
+            // Up to 3 deduplicated category dots
+            const seen = new Set();
+            const dots = events
+                .filter(e => !seen.has(e.category) && seen.add(e.category))
+                .slice(0, 3)
+                .map(e => `<div class="cal-day-dot dot-${esc(e.category)}"></div>`)
+                .join('');
+
+            const title = events.length
+                ? ` title="${esc(events.map(e => e.label).join(' · '))}"`
+                : '';
+
+            cells.push(
+                `<div class="cal-day${isToday ? ' cal-day-today' : ''}${events.length ? ' cal-day-has-event' : ''}"` +
+                ` onclick="gridDayClick('${dateStr}')"${title}>` +
+                `<div class="cal-day-num">${d}</div>` +
+                (dots ? `<div class="cal-day-dots">${dots}</div>` : '') +
+                `</div>`
+            );
+        }
+
+        return `<div class="cal-month-card">` +
+            `<div class="cal-month-card-title">${monthLabel}</div>` +
+            `<div class="cal-grid-dow">${DOW_LABELS.map(l => `<span>${l}</span>`).join('')}</div>` +
+            `<div class="cal-grid-days">${cells.join('')}</div>` +
+            `</div>`;
+    }).join('');
+}
+
+function gridDayClick(dateStr) {
+    document.getElementById('calEventLabel').value    = '';
+    document.getElementById('calEventDate').value     = dateStr;
+    document.getElementById('calEventEndDate').value  = '';
+    document.getElementById('calEventCategory').value = 'personal';
+    openModal('calEventModal');
+    setTimeout(() => document.getElementById('calEventLabel').focus(), 60);
 }
 
 // ── Modals ────────────────────────────────────
