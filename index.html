@@ -50,6 +50,11 @@
                     <span class="nav-icon">📝</span> Notes
                 </a>
             </li>
+            <li>
+                <a href="#thesis" class="nav-link" data-section="thesis">
+                    <span class="nav-icon">🎓</span> Thesis
+                </a>
+            </li>
         </ul>
         <div class="sidebar-footer">
             <button class="btn btn-ghost full-width" id="canvasSettingsBtn">⚙ Canvas Settings</button>
@@ -125,6 +130,44 @@
                     <button class="btn btn-primary" id="addNoteBtn">+ New Note</button>
                 </div>
                 <div class="notes-grid" id="notesGrid"></div>
+            </section>
+
+            <!-- Thesis -->
+            <section id="thesis" class="section">
+                <div class="thesis-subnav" role="tablist">
+                    <button class="thesis-tab-btn active" data-tab="thesis-notes" role="tab" aria-selected="true">Notes</button>
+                    <button class="thesis-tab-btn" data-tab="thesis-links" role="tab" aria-selected="false">Links</button>
+                    <button class="thesis-tab-btn" data-tab="thesis-pdfs"  role="tab" aria-selected="false">PDFs</button>
+                </div>
+
+                <!-- Notes panel -->
+                <div id="thesis-notes" class="thesis-panel active" role="tabpanel">
+                    <div class="section-header">
+                        <h2>Thesis Notes</h2>
+                        <button class="btn btn-primary" id="addThesisNoteBtn">+ New Note</button>
+                    </div>
+                    <div class="notes-grid" id="thesisNotesGrid"></div>
+                </div>
+
+                <!-- Links panel -->
+                <div id="thesis-links" class="thesis-panel" role="tabpanel">
+                    <div class="section-header">
+                        <h2>Research Links</h2>
+                        <button class="btn btn-primary" id="addThesisLinkBtn">+ Add Link</button>
+                    </div>
+                    <div id="thesisLinksList"></div>
+                </div>
+
+                <!-- PDFs panel -->
+                <div id="thesis-pdfs" class="thesis-panel" role="tabpanel">
+                    <div class="section-header">
+                        <h2>PDF Library</h2>
+                        <label class="btn btn-primary" for="pdfUploadInput" style="cursor:pointer">+ Upload PDF</label>
+                        <input type="file" id="pdfUploadInput" accept=".pdf" style="display:none" aria-label="Upload PDF file">
+                    </div>
+                    <div id="thesisPdfsList"></div>
+                    <p class="form-hint" style="margin-top:16px">PDFs are stored in your browser's IndexedDB and persist between sessions on this device.</p>
+                </div>
             </section>
 
         </div>
@@ -215,6 +258,30 @@
                 <button class="btn btn-danger" id="clearScheduleSlot">Clear Slot</button>
                 <button class="btn btn-ghost" id="cancelScheduleModal">Cancel</button>
                 <button class="btn btn-primary" id="saveScheduleSlot">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Thesis: Add Link Modal -->
+    <div class="modal-overlay" id="thesisLinkModal" role="dialog" aria-modal="true" aria-labelledby="thesisLinkModalTitle">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="thesisLinkModalTitle">Add Research Link</h3>
+                <button class="modal-close" id="closeThesisLinkModal" aria-label="Close">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="thesisLinkLabel">Label</label>
+                    <input type="text" id="thesisLinkLabel" class="input-field" placeholder="e.g. Site Analysis — Urban Heat Island">
+                </div>
+                <div class="form-group">
+                    <label for="thesisLinkUrl">URL</label>
+                    <input type="url" id="thesisLinkUrl" class="input-field" placeholder="https://…">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-ghost" id="cancelThesisLinkModal">Cancel</button>
+                <button class="btn btn-primary" id="saveThesisLinkBtn">Add Link</button>
             </div>
         </div>
     </div>

@@ -11,6 +11,7 @@ const state = {
     schedule: {},
     canvasSettings: { url: '', token: '' },
     assignments: [],
+    thesis: { notes: [], links: [], pdfs: [] },
 };
 
 // ── Persistence ───────────────────────────────
@@ -47,9 +48,14 @@ function init() {
     state.todos          = load('todos', []);
     state.projects       = load('projects', []);
     state.notes          = load('notes', []);
-    state.schedule = load('schedule', {});
+    state.schedule       = load('schedule', {});
     state.canvasSettings = load('canvasSettings', { url: '', token: '' });
     state.assignments    = load('assignments', []);
+    state.thesis = {
+        notes: load('thesis_notes', []),
+        links: load('thesis_links', []),
+        pdfs:  load('thesis_pdfs',  []),
+    };
 
     setDateDisplay();
     renderAssignments();
@@ -57,6 +63,9 @@ function init() {
     renderProjects();
     renderSchedule();
     renderNotes();
+    renderThesisNotes();
+    renderThesisLinks();
+    renderThesisPdfs();
     bindEvents();
 }
 
@@ -77,6 +86,7 @@ const SECTION_TITLES = {
     studio:      'Studio Projects',
     schedule:    'Weekly Schedule',
     notes:       'Notes',
+    thesis:      'Thesis',
 };
 
 function showSection(id) {
@@ -680,6 +690,251 @@ function renderNotes() {
     ).join('');
 }
 
+// ── Thesis ────────────────────────────────────
+
+// IndexedDB helpers for PDF binary storage
+let _pdfDB = null;
+
+function openPdfDB() {
+    return new Promise((resolve, reject) => {
+        if (_pdfDB) { resolve(_pdfDB); return; }
+        const req = indexedDB.open('cbu_thesis', 1);
+        req.onupgradeneeded = e => e.target.result.createObjectStore('pdfs', { keyPath: 'id' });
+        req.onsuccess = e => { _pdfDB = e.target.result; resolve(_pdfDB); };
+        req.onerror   = () => reject(req.error);
+    });
+}
+
+function idbPut(record) {
+    return openPdfDB().then(db => new Promise((resolve, reject) => {
+        const tx = db.transaction('pdfs', 'readwrite');
+        tx.objectStore('pdfs').put(record);
+        tx.oncomplete = resolve;
+        tx.onerror    = () => reject(tx.error);
+    }));
+}
+
+function idbGet(id) {
+    return openPdfDB().then(db => new Promise((resolve, reject) => {
+        const tx  = db.transaction('pdfs', 'readonly');
+        const req = tx.objectStore('pdfs').get(id);
+        req.onsuccess = () => resolve(req.result || null);
+        req.onerror   = () => reject(req.error);
+    }));
+}
+
+function idbDelete(id) {
+    return openPdfDB().then(db => new Promise((resolve, reject) => {
+        const tx = db.transaction('pdfs', 'readwrite');
+        tx.objectStore('pdfs').delete(id);
+        tx.oncomplete = resolve;
+        tx.onerror    = () => reject(tx.error);
+    }));
+}
+
+// Thesis sub-tab switcher
+function switchThesisTab(tabId) {
+    document.querySelectorAll('.thesis-tab-btn').forEach(btn => {
+        const active = btn.dataset.tab === tabId;
+        btn.classList.toggle('active', active);
+        btn.setAttribute('aria-selected', active);
+    });
+    document.querySelectorAll('.thesis-panel').forEach(p => {
+        p.classList.toggle('active', p.id === tabId);
+    });
+}
+
+// Thesis Notes
+function addThesisNote() {
+    const note = { id: Date.now(), title: '', content: '', updatedAt: new Date().toISOString() };
+    state.thesis.notes.unshift(note);
+    save('thesis_notes', state.thesis.notes);
+    renderThesisNotes();
+    setTimeout(() => {
+        document.querySelector(`[data-thesis-note-id="${note.id}"] .note-title`)?.focus();
+    }, 40);
+}
+
+function updateThesisNote(id, field, value) {
+    const note = state.thesis.notes.find(n => n.id === id);
+    if (!note) return;
+    note[field]    = value;
+    note.updatedAt = new Date().toISOString();
+    save('thesis_notes', state.thesis.notes);
+    const dateEl = document.querySelector(`[data-thesis-note-id="${id}"] .note-date`);
+    if (dateEl) dateEl.textContent = fmtNoteDate(note.updatedAt);
+}
+
+function deleteThesisNote(id) {
+    if (!confirm('Delete this note?')) return;
+    state.thesis.notes = state.thesis.notes.filter(n => n.id !== id);
+    save('thesis_notes', state.thesis.notes);
+    renderThesisNotes();
+}
+
+function renderThesisNotes() {
+    const el = document.getElementById('thesisNotesGrid');
+    if (!el) return;
+    if (!state.thesis.notes.length) {
+        el.innerHTML = `<div class="empty-state" style="grid-column:1/-1">
+            <div class="empty-state-icon">📝</div>
+            <div class="empty-state-text">No thesis notes yet. Click "+ New Note" to create one.</div>
+        </div>`;
+        return;
+    }
+    el.innerHTML = state.thesis.notes.map(n => `
+        <div class="note-card" data-thesis-note-id="${n.id}">
+            <input class="note-title" placeholder="Untitled" value="${esc(n.title)}"
+                oninput="updateThesisNote(${n.id}, 'title', this.value)" aria-label="Note title"/>
+            <div class="note-divider"></div>
+            <textarea class="note-content" placeholder="Write your thesis notes here…"
+                oninput="updateThesisNote(${n.id}, 'content', this.value)"
+                aria-label="Note content">${esc(n.content)}</textarea>
+            <div class="note-footer">
+                <span class="note-date">${fmtNoteDate(n.updatedAt)}</span>
+                <button class="btn btn-danger" onclick="deleteThesisNote(${n.id})">Delete</button>
+            </div>
+        </div>`
+    ).join('');
+}
+
+// Thesis Links
+function addThesisLink() {
+    const label = document.getElementById('thesisLinkLabel').value.trim();
+    let   url   = document.getElementById('thesisLinkUrl').value.trim();
+    if (!label || !url) return;
+    if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+    state.thesis.links.unshift({ id: Date.now(), label, url, addedAt: new Date().toISOString() });
+    save('thesis_links', state.thesis.links);
+    closeModal('thesisLinkModal');
+    document.getElementById('thesisLinkLabel').value = '';
+    document.getElementById('thesisLinkUrl').value   = '';
+    renderThesisLinks();
+}
+
+function deleteThesisLink(id) {
+    state.thesis.links = state.thesis.links.filter(l => l.id !== id);
+    save('thesis_links', state.thesis.links);
+    renderThesisLinks();
+}
+
+function renderThesisLinks() {
+    const el = document.getElementById('thesisLinksList');
+    if (!el) return;
+    if (!state.thesis.links.length) {
+        el.innerHTML = `<div class="empty-state">
+            <div class="empty-state-icon">🔗</div>
+            <div class="empty-state-text">No links yet. Click "+ Add Link" to save a research URL.</div>
+        </div>`;
+        return;
+    }
+    el.innerHTML = state.thesis.links.map(l => `
+        <div class="link-item">
+            <span class="link-icon">🔗</span>
+            <div class="link-info">
+                <div class="link-label">${esc(l.label)}</div>
+                <div class="link-url">${esc(l.url)}</div>
+            </div>
+            <a href="${esc(l.url)}" target="_blank" rel="noopener noreferrer"
+               class="btn btn-ghost" style="font-size:12px;padding:5px 10px">Open ↗</a>
+            <button class="btn btn-danger" onclick="deleteThesisLink(${l.id})" aria-label="Remove link">✕</button>
+        </div>`
+    ).join('');
+}
+
+// Thesis PDFs
+function fmtFileSize(bytes) {
+    if (bytes < 1024)    return `${bytes} B`;
+    if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / 1048576).toFixed(1)} MB`;
+}
+
+async function handlePdfUpload(file) {
+    if (!file || file.type !== 'application/pdf') {
+        alert('Please select a PDF file.');
+        return;
+    }
+    const id   = Date.now();
+    const meta = { id, name: file.name, size: file.size, addedAt: new Date().toISOString() };
+    try {
+        const buf = await file.arrayBuffer();
+        await idbPut({ id, data: buf });
+        state.thesis.pdfs.unshift(meta);
+        save('thesis_pdfs', state.thesis.pdfs);
+        renderThesisPdfs();
+    } catch (err) {
+        alert(`Failed to store PDF: ${err.message}`);
+    }
+}
+
+async function openThesisPdf(id) {
+    try {
+        const rec = await idbGet(id);
+        if (!rec) { alert('PDF data not found — it may have been cleared from IndexedDB.'); return; }
+        const url = URL.createObjectURL(new Blob([rec.data], { type: 'application/pdf' }));
+        window.open(url, '_blank', 'noopener');
+    } catch (err) {
+        alert(`Could not open PDF: ${err.message}`);
+    }
+}
+
+async function downloadThesisPdf(id) {
+    const meta = state.thesis.pdfs.find(p => p.id === id);
+    if (!meta) return;
+    try {
+        const rec = await idbGet(id);
+        if (!rec) { alert('PDF data not found.'); return; }
+        const url = URL.createObjectURL(new Blob([rec.data], { type: 'application/pdf' }));
+        const a   = Object.assign(document.createElement('a'), { href: url, download: meta.name });
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch (err) {
+        alert(`Download failed: ${err.message}`);
+    }
+}
+
+async function deleteThesisPdf(id) {
+    if (!confirm('Remove this PDF from the library?')) return;
+    try {
+        await idbDelete(id);
+        state.thesis.pdfs = state.thesis.pdfs.filter(p => p.id !== id);
+        save('thesis_pdfs', state.thesis.pdfs);
+        renderThesisPdfs();
+    } catch (err) {
+        alert(`Delete failed: ${err.message}`);
+    }
+}
+
+function renderThesisPdfs() {
+    const el = document.getElementById('thesisPdfsList');
+    if (!el) return;
+    if (!state.thesis.pdfs.length) {
+        el.innerHTML = `<div class="empty-state">
+            <div class="empty-state-icon">📄</div>
+            <div class="empty-state-text">No PDFs yet. Click "+ Upload PDF" to add one.</div>
+        </div>`;
+        return;
+    }
+    el.innerHTML = state.thesis.pdfs.map(p => `
+        <div class="pdf-item">
+            <span class="pdf-icon">📄</span>
+            <div class="pdf-info">
+                <div class="pdf-name">${esc(p.name)}</div>
+                <div class="pdf-meta">${fmtFileSize(p.size)} · Added ${fmtNoteDate(p.addedAt)}</div>
+            </div>
+            <div class="pdf-actions">
+                <button class="btn btn-ghost" style="font-size:12px;padding:5px 10px"
+                    onclick="openThesisPdf(${p.id})">Open</button>
+                <button class="btn btn-ghost" style="font-size:12px;padding:5px 10px"
+                    onclick="downloadThesisPdf(${p.id})">↓ Save</button>
+                <button class="btn btn-danger" onclick="deleteThesisPdf(${p.id})" aria-label="Remove PDF">✕</button>
+            </div>
+        </div>`
+    ).join('');
+}
+
 // ── Modals ────────────────────────────────────
 function openModal(id) {
     document.getElementById(id)?.classList.add('open');
@@ -755,8 +1010,37 @@ function bindEvents() {
     // Notes
     document.getElementById('addNoteBtn')?.addEventListener('click', addNote);
 
+    // Thesis sub-tabs
+    document.querySelectorAll('.thesis-tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => switchThesisTab(btn.dataset.tab));
+    });
+
+    // Thesis notes
+    document.getElementById('addThesisNoteBtn')?.addEventListener('click', addThesisNote);
+
+    // Thesis links
+    document.getElementById('addThesisLinkBtn')?.addEventListener('click', () => {
+        document.getElementById('thesisLinkLabel').value = '';
+        document.getElementById('thesisLinkUrl').value   = '';
+        openModal('thesisLinkModal');
+        setTimeout(() => document.getElementById('thesisLinkLabel').focus(), 60);
+    });
+    document.getElementById('closeThesisLinkModal')?.addEventListener('click',  () => closeModal('thesisLinkModal'));
+    document.getElementById('cancelThesisLinkModal')?.addEventListener('click', () => closeModal('thesisLinkModal'));
+    document.getElementById('saveThesisLinkBtn')?.addEventListener('click', addThesisLink);
+    document.getElementById('thesisLinkUrl')?.addEventListener('keydown', e => {
+        if (e.key === 'Enter') addThesisLink();
+    });
+
+    // Thesis PDFs
+    document.getElementById('pdfUploadInput')?.addEventListener('change', e => {
+        const file = e.target.files[0];
+        if (file) handlePdfUpload(file);
+        e.target.value = '';  // reset so the same file can be re-uploaded
+    });
+
     // Close modals on backdrop click
-    ['canvasModal', 'projectModal', 'scheduleModal'].forEach(id => {
+    ['canvasModal', 'projectModal', 'scheduleModal', 'thesisLinkModal'].forEach(id => {
         document.getElementById(id)?.addEventListener('click', e => {
             if (e.target === document.getElementById(id)) closeModal(id);
         });
@@ -765,7 +1049,7 @@ function bindEvents() {
     // Close modals on Escape key
     document.addEventListener('keydown', e => {
         if (e.key === 'Escape') {
-            ['canvasModal', 'projectModal', 'scheduleModal'].forEach(id => {
+            ['canvasModal', 'projectModal', 'scheduleModal', 'thesisLinkModal'].forEach(id => {
                 if (document.getElementById(id)?.classList.contains('open')) closeModal(id);
             });
         }
