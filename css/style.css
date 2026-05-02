@@ -630,7 +630,7 @@ body {
     vertical-align: top;
     background: var(--bg-2);
     min-width: 80px;
-    min-height: 48px;
+    height: 52px;
 }
 
 .schedule-table td:first-child {

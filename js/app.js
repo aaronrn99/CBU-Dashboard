@@ -47,8 +47,7 @@ function init() {
     state.todos          = load('todos', []);
     state.projects       = load('projects', []);
     state.notes          = load('notes', []);
-    // Merge saved overrides on top of defaults — empty array [] means user intentionally cleared that slot
-    state.schedule = { ...DEFAULT_SCHEDULE, ...load('schedule', {}) };
+    state.schedule = load('schedule', {});
     state.canvasSettings = load('canvasSettings', { url: '', token: '' });
     state.assignments    = load('assignments', []);
 
@@ -416,42 +415,69 @@ function clearProjectForm() {
 
 // ── Schedule ──────────────────────────────────
 
-// Fall 2026 course schedule — merged as defaults; user edits stored in localStorage override these
-const DEFAULT_SCHEDULE = {
-    // Monday
-    'Monday|1:00 PM': ['ARCH 3100 Design Studio III'],
-    'Monday|2:00 PM': ['ARCH 3100 Design Studio III'],
-    'Monday|3:00 PM': ['ARCH 3100 Design Studio III'],
-    'Monday|4:00 PM': ['ARCH 3100 Design Studio III'],
-
-    // Tuesday
-    'Tuesday|9:00 AM': ['GNST 0500 Chapel Convocation'],
-    'Tuesday|3:00 PM': ['ARCH 3800 Thermal Environmental Systems'],
-    'Tuesday|4:00 PM': ['ARCH 3800 Thermal Environmental Systems'],
-    'Tuesday|6:00 PM': ['ARCH 3930 Structural Systems I'],
-    'Tuesday|7:00 PM': ['ARCH 3930 Structural Systems I'],
-    'Tuesday|8:00 PM': ['ARCH 3930 Structural Systems I'],
-
-    // Wednesday
-    'Wednesday|9:00 AM':  ['ARCH 3500 Architectural Theory I'],
-    'Wednesday|10:00 AM': ['ARCH 3500 Architectural Theory I'],
-    'Wednesday|1:00 PM':  ['ARCH 3100 Design Studio III'],
-    'Wednesday|2:00 PM':  ['ARCH 3100 Design Studio III'],
-    'Wednesday|3:00 PM':  ['ARCH 3100 Design Studio III'],
-    'Wednesday|4:00 PM':  ['ARCH 3100 Design Studio III'],
-
-    // Thursday
-    'Thursday|3:00 PM': ['ARCH 3800 Thermal Environmental Systems'],
-    'Thursday|4:00 PM': ['ARCH 3800 Thermal Environmental Systems'],
-
-    // Friday
-    'Friday|9:00 AM':  ['ARCH 3500 Architectural Theory I'],
-    'Friday|10:00 AM': ['ARCH 3500 Architectural Theory I'],
-    'Friday|1:00 PM':  ['ARCH 3100 Design Studio III'],
-    'Friday|2:00 PM':  ['ARCH 3100 Design Studio III'],
-    'Friday|3:00 PM':  ['ARCH 3100 Design Studio III'],
-    'Friday|4:00 PM':  ['ARCH 3100 Design Studio III'],
-};
+// Fall 2026 courses — each block renders once with rowspan to span its full duration
+const COURSE_BLOCKS = [
+    {
+        code:         'ARCH 3100',
+        title:        'Design Studio III',
+        room:         'Arch 222',
+        days:         ['Monday', 'Wednesday', 'Friday'],
+        startTime:    '1:00 PM',
+        displayStart: '1:15 PM',
+        displayEnd:   '5:00 PM',
+        slots:        4,
+        color:        '#58a6ff',
+        bg:           'rgba(88,166,255,0.10)',
+    },
+    {
+        code:         'ARCH 3500',
+        title:        'Architectural Theory I',
+        room:         null,
+        days:         ['Wednesday', 'Friday'],
+        startTime:    '9:00 AM',
+        displayStart: '9:00 AM',
+        displayEnd:   '10:30 AM',
+        slots:        2,
+        color:        '#a371f7',
+        bg:           'rgba(163,113,247,0.10)',
+    },
+    {
+        code:         'ARCH 3800',
+        title:        'Thermal Environmental Systems',
+        room:         'Arch 114',
+        days:         ['Tuesday', 'Thursday'],
+        startTime:    '3:00 PM',
+        displayStart: '3:00 PM',
+        displayEnd:   '4:30 PM',
+        slots:        2,
+        color:        '#3fb950',
+        bg:           'rgba(63,185,80,0.10)',
+    },
+    {
+        code:         'ARCH 3930',
+        title:        'Structural Systems I',
+        room:         'Arch 114',
+        days:         ['Tuesday'],
+        startTime:    '6:00 PM',
+        displayStart: '6:30 PM',
+        displayEnd:   '9:30 PM',
+        slots:        3,
+        color:        '#d29922',
+        bg:           'rgba(210,153,34,0.10)',
+    },
+    {
+        code:         'GNST 0500',
+        title:        'Chapel Convocation',
+        room:         null,
+        days:         ['Tuesday'],
+        startTime:    '9:00 AM',
+        displayStart: '9:00 AM',
+        displayEnd:   '10:00 AM',
+        slots:        1,
+        color:        '#f0883e',
+        bg:           'rgba(240,136,62,0.10)',
+    },
+];
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
 const DAY_FULL = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
@@ -511,14 +537,52 @@ function renderSchedule() {
 
     const editCls = scheduleEditing ? 'editable' : '';
 
+    // Map each time string to its row index
+    const timeIndex = {};
+    TIMES.forEach((t, i) => { timeIndex[t] = i; });
+
+    // coverage[dayIdx][timeIdx] = { block, isStart: bool }
+    const coverage = Array.from({ length: DAY_FULL.length }, () => ({}));
+    COURSE_BLOCKS.forEach(block => {
+        const si = timeIndex[block.startTime];
+        if (si === undefined) return;
+        block.days.forEach(day => {
+            const di = DAY_FULL.indexOf(day);
+            if (di < 0) return;
+            for (let i = si; i < si + block.slots; i++) {
+                coverage[di][i] = { block, isStart: i === si };
+            }
+        });
+    });
+
     const thead = `<tr>
         <th style="min-width:72px">Time</th>
         ${DAY_FULL.map(d => `<th>${d}</th>`).join('')}
     </tr>`;
 
-    const tbody = TIMES.map(time => {
-        const cells = DAYS.map((day, di) => {
-            const key    = `${DAY_FULL[di]}|${time}`;
+    const tbody = TIMES.map((time, ti) => {
+        const cells = DAY_FULL.map((day, di) => {
+            const info = coverage[di][ti];
+
+            // This row is interior to a rowspan block above — emit nothing
+            if (info && !info.isStart) return '';
+
+            // First row of a course block — emit a spanning cell
+            if (info && info.isStart) {
+                const { block } = info;
+                const meta = [
+                    `${block.displayStart}–${block.displayEnd}`,
+                    block.room,
+                ].filter(Boolean).join(' · ');
+                return `<td rowspan="${block.slots}" style="background:${block.bg};border-left:3px solid ${block.color};vertical-align:top;padding:10px 10px 8px;">
+                    <div style="color:${block.color};font-size:11.5px;font-weight:700;letter-spacing:0.02em;line-height:1">${esc(block.code)}</div>
+                    <div style="color:var(--text-1);font-size:12px;margin-top:4px;line-height:1.3">${esc(block.title)}</div>
+                    <div style="color:var(--text-2);font-size:10.5px;margin-top:5px">${esc(meta)}</div>
+                </td>`;
+            }
+
+            // Empty slot — editable by the user
+            const key = `${day}|${time}`;
             const events = (state.schedule[key] || []).filter(Boolean);
             const evHtml = events.map(e =>
                 `<div class="schedule-event ${editCls}"
