@@ -47,7 +47,8 @@ function init() {
     state.todos          = load('todos', []);
     state.projects       = load('projects', []);
     state.notes          = load('notes', []);
-    state.schedule       = load('schedule', {});
+    // Merge saved overrides on top of defaults — empty array [] means user intentionally cleared that slot
+    state.schedule = { ...DEFAULT_SCHEDULE, ...load('schedule', {}) };
     state.canvasSettings = load('canvasSettings', { url: '', token: '' });
     state.assignments    = load('assignments', []);
 
@@ -414,6 +415,44 @@ function clearProjectForm() {
 }
 
 // ── Schedule ──────────────────────────────────
+
+// Fall 2026 course schedule — merged as defaults; user edits stored in localStorage override these
+const DEFAULT_SCHEDULE = {
+    // Monday
+    'Monday|1:00 PM': ['ARCH 3100 Design Studio III'],
+    'Monday|2:00 PM': ['ARCH 3100 Design Studio III'],
+    'Monday|3:00 PM': ['ARCH 3100 Design Studio III'],
+    'Monday|4:00 PM': ['ARCH 3100 Design Studio III'],
+
+    // Tuesday
+    'Tuesday|9:00 AM': ['GNST 0500 Chapel Convocation'],
+    'Tuesday|3:00 PM': ['ARCH 3800 Thermal Environmental Systems'],
+    'Tuesday|4:00 PM': ['ARCH 3800 Thermal Environmental Systems'],
+    'Tuesday|6:00 PM': ['ARCH 3930 Structural Systems I'],
+    'Tuesday|7:00 PM': ['ARCH 3930 Structural Systems I'],
+    'Tuesday|8:00 PM': ['ARCH 3930 Structural Systems I'],
+
+    // Wednesday
+    'Wednesday|9:00 AM':  ['ARCH 3500 Architectural Theory I'],
+    'Wednesday|10:00 AM': ['ARCH 3500 Architectural Theory I'],
+    'Wednesday|1:00 PM':  ['ARCH 3100 Design Studio III'],
+    'Wednesday|2:00 PM':  ['ARCH 3100 Design Studio III'],
+    'Wednesday|3:00 PM':  ['ARCH 3100 Design Studio III'],
+    'Wednesday|4:00 PM':  ['ARCH 3100 Design Studio III'],
+
+    // Thursday
+    'Thursday|3:00 PM': ['ARCH 3800 Thermal Environmental Systems'],
+    'Thursday|4:00 PM': ['ARCH 3800 Thermal Environmental Systems'],
+
+    // Friday
+    'Friday|9:00 AM':  ['ARCH 3500 Architectural Theory I'],
+    'Friday|10:00 AM': ['ARCH 3500 Architectural Theory I'],
+    'Friday|1:00 PM':  ['ARCH 3100 Design Studio III'],
+    'Friday|2:00 PM':  ['ARCH 3100 Design Studio III'],
+    'Friday|3:00 PM':  ['ARCH 3100 Design Studio III'],
+    'Friday|4:00 PM':  ['ARCH 3100 Design Studio III'],
+};
+
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
 const DAY_FULL = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 const TIMES = [
@@ -458,7 +497,8 @@ function saveScheduleSlot() {
 
 function clearScheduleSlot() {
     if (!pendingSlotKey) return;
-    delete state.schedule[pendingSlotKey];
+    // Store [] rather than deleting so the empty override survives a reload and won't re-merge the default
+    state.schedule[pendingSlotKey] = [];
     save('schedule', state.schedule);
     pendingSlotKey = null;
     closeModal('scheduleModal');
@@ -479,7 +519,7 @@ function renderSchedule() {
     const tbody = TIMES.map(time => {
         const cells = DAYS.map((day, di) => {
             const key    = `${DAY_FULL[di]}|${time}`;
-            const events = state.schedule[key] || [];
+            const events = (state.schedule[key] || []).filter(Boolean);
             const evHtml = events.map(e =>
                 `<div class="schedule-event ${editCls}"
                       ${scheduleEditing ? `onclick="event.stopPropagation();openScheduleSlot('${key}')"` : ''}
