@@ -60,8 +60,7 @@ function init() {
     };
 
     setDateDisplay();
-    updateWelcomeBanner();
-    setInterval(updateWelcomeBanner, 60000);
+    initBanner();
     renderAssignments();
     renderTodos();
     renderProjects();
@@ -75,45 +74,77 @@ function init() {
 }
 
 // ── Date & Banner ─────────────────────────────
-function getWelcomeMessage() {
+
+// Banner state
+let _bannerPool  = [];
+let _bannerIndex = 0;
+
+// Build the message pool for the current moment.
+// Index 0 is always the time-based base message; expanded date messages follow.
+function getBannerPool() {
     const now   = new Date();
-    const month = now.getMonth() + 1;  // 1–12
+    const month = now.getMonth() + 1;
     const day   = now.getDate();
     const hour  = now.getHours();
 
-    // Pack month+day into a comparable integer (MMDD)
-    const is = (m, d) => month === m && day === d;
-    const between = (m1, d1, m2, d2) => {
+    const is      = (m, d)             => month === m && day === d;
+    const between = (m1, d1, m2, d2)   => {
         const n = month * 100 + day;
         return n >= m1 * 100 + d1 && n <= m2 * 100 + d2;
     };
 
-    // ── Proximity messages ─────────────────
-    // Thanksgiving (Nov 25–27) — checked before winter-break overlaps
-    if (between(11, 25, 11, 27)) return 'Enjoy your break, Aaron.';
-    if (between(11, 22, 11, 24)) return 'A few days until Thanksgiving break, Aaron.';
-    if (is(11, 18))              return '1 week until Thanksgiving break, Aaron.';
-    if (is(11, 11))              return '2 weeks until Thanksgiving break, Aaron.';
-    if (is(11, 4))               return '3 weeks until Thanksgiving break, Aaron.';
+    // Base message (time-of-day)
+    let base;
+    if      (hour >= 5  && hour < 12) base = 'GOOD MORNING, AARON.';
+    else if (hour >= 12 && hour < 17) base = 'GOOD AFTERNOON, AARON.';
+    else if (hour >= 17 && hour < 21) base = 'GOOD EVENING, AARON.';
+    else if (hour >= 21)              base = 'WORKING LATE, AARON.';
+    else                              base = 'UP EARLY, AARON.';
 
-    // Winter break / finals (Dec 11 = Semester Closes — beats "finals week")
-    if (month === 12 && day >= 11) return "Semester's done, Aaron.";
-    if (between(12, 7, 12, 10))  return 'Finals week, Aaron.';
-    if (is(12, 4))               return '1 week until winter break, Aaron.';
-    if (is(11, 27))              return '2 weeks until winter break, Aaron.';
-    if (is(11, 20))              return '3 weeks until winter break, Aaron.';
+    const pool = [base];
 
-    // ── Time-based fallback ────────────────
-    if (hour >= 5  && hour < 12) return 'Good morning, Aaron.';
-    if (hour >= 12 && hour < 17) return 'Good afternoon, Aaron.';
-    if (hour >= 17 && hour < 21) return 'Good evening, Aaron.';
-    if (hour >= 21)              return 'Working late, Aaron.';
-    return 'Up early, Aaron.';
+    // Expanded date-specific messages (added when date matches)
+    if (is(11, 4))               pool.push('3 WEEKS UNTIL THANKSGIVING BREAK, AARON.');
+    if (is(11, 11))              pool.push('2 WEEKS UNTIL THANKSGIVING BREAK, AARON.');
+    if (is(11, 18))              pool.push('1 WEEK UNTIL THANKSGIVING BREAK, AARON.');
+    if (between(11, 22, 11, 24)) pool.push('A FEW DAYS UNTIL THANKSGIVING BREAK, AARON.');
+    if (between(11, 25, 11, 27)) pool.push('ENJOY YOUR BREAK, AARON.');
+    if (is(11, 20))              pool.push('3 WEEKS UNTIL WINTER BREAK, AARON.');
+    if (is(11, 27))              pool.push('2 WEEKS UNTIL WINTER BREAK, AARON.');
+    if (is(12, 4))               pool.push('1 WEEK UNTIL WINTER BREAK, AARON.');
+    if (between(12, 7, 12, 11))  pool.push('FINALS WEEK, AARON.');
+    if (month === 12 && day >= 11) pool.push("SEMESTER'S DONE, AARON.");
+
+    return pool;
 }
 
-function updateWelcomeBanner() {
+// Fade the banner to a new message (opacity transition is in CSS)
+function fadeToBannerMessage(msg) {
     const el = document.getElementById('welcomeBanner');
-    if (el) el.textContent = getWelcomeMessage();
+    if (!el) return;
+    el.style.opacity = '0';
+    setTimeout(() => {
+        el.textContent = msg;
+        el.style.opacity = '1';
+    }, 650);
+}
+
+// Advance to the next message in the pool (called every 20 minutes)
+function advanceBanner() {
+    const newPool = getBannerPool();
+    // Keep cycling; if pool shrank, clamp index to avoid out-of-bounds
+    _bannerIndex = (_bannerIndex + 1) % newPool.length;
+    _bannerPool  = newPool;
+    fadeToBannerMessage(_bannerPool[_bannerIndex]);
+}
+
+// Initialise banner on page load
+function initBanner() {
+    _bannerPool  = getBannerPool();
+    _bannerIndex = 0;
+    const el = document.getElementById('welcomeBanner');
+    if (el) el.textContent = _bannerPool[0];
+    setInterval(advanceBanner, 20 * 60 * 1000);   // rotate every 20 minutes
 }
 
 function setDateDisplay() {
