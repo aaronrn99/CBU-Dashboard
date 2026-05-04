@@ -1585,8 +1585,11 @@ async function loadFilesFolder(path) {
         <div class="files-loading-dots"><span></span><span></span><span></span></div>Loading…</div>`;
     updateFilesBreadcrumb();
     try {
+        // Dropbox requires path="" for root (not "/" or null); recursive must be explicit false
         const result = await dropboxAPI('files/list_folder', {
-            path, include_media_info: true, limit: 300,
+            path:      path === '' ? '' : path,
+            recursive: false,
+            limit:     100,
         });
         renderFilesGrid(result.entries || []);
     } catch (err) {
