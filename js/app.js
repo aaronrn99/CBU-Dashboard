@@ -155,17 +155,28 @@ function initBannerImages() {
     const slideB = document.getElementById('bannerSlideB');
     if (!slideA || !slideB) return;
 
-    const TOTAL = 10;
+    const IMAGES = [
+        'images/Image 1.jpeg',
+        'images/Image 2.jpeg',
+        'images/Image 3.jpeg',
+        'images/Image 4.jpeg',
+        'images/image 5.jpeg',
+        'images/Image 6.jpeg',
+        'images/Image 7.jpeg',
+        'images/Image 8.jpeg',
+        'images/Image 9.jpeg',
+        'images/Image 10 .jpeg',
+    ];
     let current = slideA;
     let next    = slideB;
     let idx     = 0;
 
     // Load first image, fade in once it's ready
-    current.src = 'images/image1.jpg';
+    current.src = IMAGES[0];
     setTimeout(() => current.classList.add('active'), 100);
 
     setInterval(() => {
-        idx = (idx + 1) % TOTAL;
+        idx = (idx + 1) % IMAGES.length;
         // Capture current slide references so the onload closure is correct
         // even if the interval fires again before the image finishes loading.
         const outgoing = current;
@@ -174,7 +185,7 @@ function initBannerImages() {
             incoming.classList.add('active');   // fade in new image
             outgoing.classList.remove('active'); // fade out old image
         };
-        incoming.src = `images/image${idx + 1}.jpg`;
+        incoming.src = IMAGES[idx];
         [current, next] = [next, current]; // swap roles for next cycle
     }, 15000);
 }
