@@ -692,29 +692,39 @@ function findTimeSlotIdx(startHM) {
 }
 
 // ── Custom Events (shared Schedule ↔ Calendar store) ──
-let _pendingCustomEventDate = null;
-
 function openCustomEventFromCell(dateStr, timeSlot) {
-    _pendingCustomEventDate = dateStr;
-    const startHM = displayTimeToHM(timeSlot);
-    const d = new Date(dateStr + 'T12:00:00');
+    const startHM  = displayTimeToHM(timeSlot);
+    const d        = new Date(dateStr + 'T12:00:00');
     const dayLabel = d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
-    document.getElementById('schedCustomEventName').value = '';
-    document.getElementById('schedCustomStartTime').value = startHM;
-    document.getElementById('schedCustomEndTime').value   = addOneHourHM(startHM);
-    document.getElementById('schedCustomEventSubtitle').textContent = `${dayLabel} · ${timeSlot}`;
+    document.getElementById('schedCustomEventDate').value      = dateStr;
+    document.getElementById('schedCustomEventDateGroup').style.display = 'none';
+    document.getElementById('schedCustomEventSubtitle').textContent    = `${dayLabel} · ${timeSlot}`;
+    document.getElementById('schedCustomEventName').value  = '';
+    document.getElementById('schedCustomStartTime').value  = startHM;
+    document.getElementById('schedCustomEndTime').value    = addOneHourHM(startHM);
     openModal('schedCustomEventModal');
     setTimeout(() => document.getElementById('schedCustomEventName').focus(), 60);
 }
 
+function openAddScheduleEvent() {
+    document.getElementById('schedCustomEventDate').value      = '';
+    document.getElementById('schedCustomEventDateGroup').style.display = '';
+    document.getElementById('schedCustomEventSubtitle').textContent    = '';
+    document.getElementById('schedCustomEventName').value  = '';
+    document.getElementById('schedCustomStartTime').value  = '';
+    document.getElementById('schedCustomEndTime').value    = '';
+    openModal('schedCustomEventModal');
+    setTimeout(() => document.getElementById('schedCustomEventDate').focus(), 60);
+}
+
 function saveCustomEvent() {
     const name      = document.getElementById('schedCustomEventName').value.trim();
+    const date      = document.getElementById('schedCustomEventDate').value;
     const startTime = document.getElementById('schedCustomStartTime').value;
     const endTime   = document.getElementById('schedCustomEndTime').value;
-    if (!name || !_pendingCustomEventDate) return;
-    state.customEvents.push({ id: Date.now(), name, date: _pendingCustomEventDate, startTime, endTime, category: 'personal' });
+    if (!name || !date) return;
+    state.customEvents.push({ id: Date.now(), name, date, startTime, endTime, category: 'personal' });
     save('custom_events', state.customEvents);
-    _pendingCustomEventDate = null;
     closeModal('schedCustomEventModal');
     renderSchedule();
     renderCalendar();
@@ -1817,6 +1827,9 @@ function bindEvents() {
     document.getElementById('projectName')?.addEventListener('keydown', e => {
         if (e.key === 'Enter') addProject();
     });
+
+    // Schedule — add event button
+    document.getElementById('addScheduleEventBtn')?.addEventListener('click', openAddScheduleEvent);
 
     // Schedule custom event modal
     document.getElementById('closeSchedCustomModal')?.addEventListener('click',  () => closeModal('schedCustomEventModal'));

@@ -140,6 +140,7 @@
             <section id="schedule" class="section">
                 <div class="section-header">
                     <h2>Weekly Schedule</h2>
+                    <button class="btn btn-primary" id="addScheduleEventBtn">+ Add Event</button>
                     <button class="btn btn-ghost" id="editScheduleBtn">Edit</button>
                 </div>
                 <div class="schedule-nav">
@@ -462,6 +463,10 @@
             </div>
             <div class="modal-body">
                 <p class="form-hint" style="margin-bottom:12px" id="schedCustomEventSubtitle"></p>
+                <div class="form-group" id="schedCustomEventDateGroup">
+                    <label for="schedCustomEventDate">Date</label>
+                    <input type="date" id="schedCustomEventDate" class="input-field">
+                </div>
                 <div class="form-group">
                     <label for="schedCustomEventName">Event Name</label>
                     <input type="text" id="schedCustomEventName" class="input-field" placeholder="e.g. Studio Review">
