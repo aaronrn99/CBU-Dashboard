@@ -1370,6 +1370,41 @@ body {
     margin-bottom: 10px;
 }
 
+.files-card-footer {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 4px;
+}
+.files-card-footer .files-card-meta { flex: 1; margin: 0; }
+
+.files-dl-btn {
+    flex-shrink: 0;
+    background: none;
+    border: 1px solid rgba(63, 185, 80, 0.3);
+    color: var(--green);
+    width: 24px;
+    height: 24px;
+    border-radius: 4px;
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background var(--ease), border-color var(--ease);
+}
+.files-dl-btn:hover:not(:disabled) {
+    background: var(--green-dim);
+    border-color: var(--green);
+}
+.files-dl-btn:disabled {
+    opacity: 0.5;
+    cursor: default;
+    font-size: 9px;
+    letter-spacing: -0.02em;
+}
+
 .files-suggested {
     margin-top: 32px;
     padding-top: 20px;

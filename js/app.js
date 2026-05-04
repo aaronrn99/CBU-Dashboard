@@ -1601,6 +1601,8 @@ async function loadFilesFolder(path) {
 }
 
 // ── Grid rendering ────────────────────────────
+let _filesEntries = [];  // cached so the click handler can look up by idx
+
 function renderFilesGrid(entries) {
     const grid = document.getElementById('filesGrid');
     if (!grid) return;
@@ -1616,6 +1618,7 @@ function renderFilesGrid(entries) {
         if (af !== bf) return af ? -1 : 1;
         return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
     });
+    _filesEntries = sorted;
 
     grid.innerHTML = sorted.map((entry, idx) => {
         const isFolder = entry['.tag'] === 'folder';
@@ -1623,6 +1626,12 @@ function renderFilesGrid(entries) {
             ? new Date(entry.server_modified).toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' })
             : '';
         const meta = [modified, entry.size ? fmtFileSize(entry.size) : ''].filter(Boolean).join(' · ');
+        const footer = isFolder
+            ? `<div class="files-card-meta">${meta}</div>`
+            : `<div class="files-card-footer">
+                   <span class="files-card-meta">${meta}</span>
+                   <button class="files-dl-btn" data-dl-idx="${idx}" title="Download ${esc(entry.name)}" aria-label="Download">↓</button>
+               </div>`;
         return `
         <div class="files-card" data-idx="${idx}"
              data-path="${esc(entry.path_lower || '')}"
@@ -1632,14 +1641,13 @@ function renderFilesGrid(entries) {
             <div class="files-card-preview">${fileTypeIcon(entry)}</div>
             <div class="files-card-info">
                 <div class="files-card-name">${esc(entry.name)}</div>
-                <div class="files-card-meta">${meta}</div>
+                ${footer}
             </div>
         </div>`;
     }).join('');
 
-    // Event delegation — handles all card clicks safely without inline handlers
-    grid.onclick = null;  // remove any previous handler before re-attaching
-    grid.addEventListener('click', filesGridClick, { once: true });
+    // Persistent onclick — download clicks must not consume the listener
+    grid.onclick = filesGridClick;
 
     // Async thumbnails for images
     sorted.forEach((entry, idx) => {
@@ -1648,10 +1656,17 @@ function renderFilesGrid(entries) {
 }
 
 function filesGridClick(e) {
+    // Download button takes priority over card navigation
+    const dlBtn = e.target.closest('.files-dl-btn');
+    if (dlBtn) {
+        const entry = _filesEntries[+dlBtn.dataset.dlIdx];
+        if (entry) downloadDropboxFile(entry.path_lower, entry.name, dlBtn);
+        return;
+    }
     const card = e.target.closest('.files-card');
     if (!card) return;
-    const path  = card.dataset.path;
-    const name  = card.dataset.name;
+    const path = card.dataset.path;
+    const name = card.dataset.name;
     if (card.dataset.folder) {
         filesPathStack.push({ path, label: name });
         loadFilesFolder(path);
@@ -1714,6 +1729,54 @@ async function openDropboxFile(path, name) {
         const link = await dropboxTempLink(path);
         window.open(link, '_blank', 'noopener');
     } catch (err) { showErr(err.message); }
+}
+
+// ── Download file ──────────────────────────────
+async function downloadDropboxFile(path, name, btn) {
+    const grid    = document.getElementById('filesGrid');
+    const origLabel = btn?.textContent;
+
+    const showErr = msg => {
+        if (!grid) return;
+        const t = document.createElement('div');
+        t.className = 'files-error-toast';
+        t.textContent = `⚠ Could not download "${name}": ${msg}`;
+        grid.prepend(t);
+        setTimeout(() => t.remove(), 6000);
+    };
+
+    try {
+        if (btn) { btn.textContent = '…'; btn.disabled = true; }
+
+        const token = getDropboxToken();
+        if (!token) throw new Error('No Dropbox token — go to Settings to connect.');
+
+        const res = await fetch('https://content.dropboxapi.com/2/files/download', {
+            method:  'POST',
+            headers: {
+                'Authorization':   `Bearer ${token}`,
+                'Dropbox-API-Arg': JSON.stringify({ path }),
+            },
+        });
+
+        if (!res.ok) {
+            let msg = `Dropbox ${res.status}`;
+            try { const j = await res.json(); msg = j.error_summary || j.user_message || msg; } catch {}
+            throw new Error(msg);
+        }
+
+        const blob = await res.blob();
+        const url  = URL.createObjectURL(blob);
+        const a    = Object.assign(document.createElement('a'), { href: url, download: name });
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch (err) {
+        showErr(err.message);
+    } finally {
+        if (btn) { btn.textContent = origLabel; btn.disabled = false; }
+    }
 }
 
 // ── Settings ──────────────────────────────────
