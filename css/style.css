@@ -1591,3 +1591,47 @@ body {
 .thesis-tab-btn                       { color: rgba(61, 186, 114, 0.55); }
 .thesis-tab-btn.active,
 .thesis-tab-btn:hover:not(.active)    { color: #3dba72; }
+
+/* ── Custom Schedule Events (shared store) ── */
+.sched-clickable { cursor: pointer; }
+.sched-clickable:hover { background: rgba(255,255,255,0.025); }
+
+.sched-custom-event {
+    position: relative;
+    background: rgba(88,166,255,0.10);
+    border-left: 3px solid var(--accent);
+    border-radius: 3px;
+    padding: 4px 22px 4px 7px;
+    margin: 2px 0;
+    font-size: 11px;
+    line-height: 1.3;
+}
+.sched-custom-event-name {
+    color: var(--accent);
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.sched-custom-event-time {
+    color: var(--text-3);
+    font-size: 10px;
+    margin-top: 1px;
+}
+.sched-custom-event-del {
+    position: absolute;
+    top: 3px;
+    right: 3px;
+    background: none;
+    border: none;
+    color: var(--text-3);
+    font-size: 10px;
+    cursor: pointer;
+    padding: 1px 3px;
+    line-height: 1;
+    border-radius: 2px;
+    opacity: 0;
+    transition: opacity 0.15s;
+}
+.sched-custom-event:hover .sched-custom-event-del { opacity: 1; }
+.sched-custom-event-del:hover { color: var(--red); background: var(--red-dim); }

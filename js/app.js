@@ -13,6 +13,7 @@ const state = {
     assignments: [],
     thesis: { notes: [], links: [], pdfs: [] },
     calendarEvents: [],
+    customEvents: [],   // shared store — synced between Schedule and Calendar tabs
 };
 
 // ── Persistence ───────────────────────────────
@@ -53,6 +54,7 @@ function init() {
     state.canvasSettings = load('canvasSettings', { url: '', token: '' });
     state.assignments    = load('assignments', []);
     state.calendarEvents = load('calendarEvents', []);
+    state.customEvents   = load('custom_events', []);
     state.thesis = {
         notes: load('thesis_notes', []),
         links: load('thesis_links', []),
@@ -640,6 +642,96 @@ function toDateStr(d) {
     return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
 
+// ── Time utilities ─────────────────────────
+// "9:00 AM" → "09:00"
+function displayTimeToHM(t) {
+    const m = t.match(/^(\d+):(\d+)\s*(AM|PM)$/i);
+    if (!m) return '09:00';
+    let h = +m[1], min = +m[2], p = m[3].toUpperCase();
+    if (p === 'PM' && h !== 12) h += 12;
+    if (p === 'AM' && h === 12) h = 0;
+    return `${String(h).padStart(2,'0')}:${String(min).padStart(2,'0')}`;
+}
+
+// "09:00" → one hour later "10:00"
+function addOneHourHM(hm) {
+    const [h, m] = hm.split(':').map(Number);
+    return `${String(Math.min(h + 1, 23)).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+}
+
+// "09:30" → "9:30 AM"
+function hmToDisplayTime(hm) {
+    if (!hm) return '';
+    const [h, m] = hm.split(':').map(Number);
+    const p = h >= 12 ? 'PM' : 'AM';
+    const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+    return `${h12}:${String(m).padStart(2,'0')} ${p}`;
+}
+
+// "9:00 AM" → minutes since midnight (for slot lookup)
+function displayTimeToMins(t) {
+    const m = t.match(/^(\d+):(\d+)\s*(AM|PM)$/i);
+    if (!m) return -1;
+    let h = +m[1], min = +m[2], p = m[3].toUpperCase();
+    if (p === 'PM' && h !== 12) h += 12;
+    if (p === 'AM' && h === 12) h = 0;
+    return h * 60 + min;
+}
+
+// "09:30" (HH:MM) → which TIMES[] index it belongs to
+function findTimeSlotIdx(startHM) {
+    if (!startHM) return -1;
+    const [h, m] = startHM.split(':').map(Number);
+    const eventMins = h * 60 + m;
+    for (let i = 0; i < TIMES.length; i++) {
+        const slotMins = displayTimeToMins(TIMES[i]);
+        const nextMins = i + 1 < TIMES.length ? displayTimeToMins(TIMES[i + 1]) : slotMins + 60;
+        if (eventMins >= slotMins && eventMins < nextMins) return i;
+    }
+    return -1;
+}
+
+// ── Custom Events (shared Schedule ↔ Calendar store) ──
+let _pendingCustomEventDate = null;
+
+function openCustomEventFromCell(dateStr, timeSlot) {
+    _pendingCustomEventDate = dateStr;
+    const startHM = displayTimeToHM(timeSlot);
+    const d = new Date(dateStr + 'T12:00:00');
+    const dayLabel = d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+    document.getElementById('schedCustomEventName').value = '';
+    document.getElementById('schedCustomStartTime').value = startHM;
+    document.getElementById('schedCustomEndTime').value   = addOneHourHM(startHM);
+    document.getElementById('schedCustomEventSubtitle').textContent = `${dayLabel} · ${timeSlot}`;
+    openModal('schedCustomEventModal');
+    setTimeout(() => document.getElementById('schedCustomEventName').focus(), 60);
+}
+
+function saveCustomEvent() {
+    const name      = document.getElementById('schedCustomEventName').value.trim();
+    const startTime = document.getElementById('schedCustomStartTime').value;
+    const endTime   = document.getElementById('schedCustomEndTime').value;
+    if (!name || !_pendingCustomEventDate) return;
+    state.customEvents.push({ id: Date.now(), name, date: _pendingCustomEventDate, startTime, endTime, category: 'personal' });
+    save('custom_events', state.customEvents);
+    _pendingCustomEventDate = null;
+    closeModal('schedCustomEventModal');
+    renderSchedule();
+    renderCalendar();
+}
+
+function deleteCustomEvent(id) {
+    state.customEvents = state.customEvents.filter(e => e.id !== id);
+    save('custom_events', state.customEvents);
+    renderSchedule();
+    renderCalendar();
+}
+
+function deleteAnyEvent(id) {
+    if (state.customEvents.some(e => e.id === id)) deleteCustomEvent(id);
+    else deleteCalendarEvent(id);
+}
+
 function toggleScheduleEdit() {
     scheduleEditing = !scheduleEditing;
     const btn = document.getElementById('editScheduleBtn');
@@ -775,15 +867,33 @@ function renderSchedule() {
                 </td>`;
             }
 
-            // Empty slot — user events are keyed by day-of-week (repeat every week)
+            // Empty slot — weekly text events (edit mode) + date-specific custom events
             const key = `${DAY_FULL[di]}|${time}`;
             const events = (state.schedule[key] || []).filter(Boolean);
+            const cellDateStr = toDateStr(date);
+            const cellCustom  = state.customEvents.filter(e => e.date === cellDateStr && findTimeSlotIdx(e.startTime) === ti);
+
             const evHtml = events.map(e =>
                 `<div class="schedule-event ${editCls}"
                       ${scheduleEditing ? `onclick="event.stopPropagation();openScheduleSlot('${key}')"` : ''}
                  >${esc(e)}</div>`
             ).join('');
-            return `<td class="${editCls}" ${scheduleEditing ? `onclick="openScheduleSlot('${key}')"` : ''}>${evHtml}</td>`;
+
+            const customHtml = cellCustom.map(e => {
+                const timeRange = e.startTime && e.endTime
+                    ? `${hmToDisplayTime(e.startTime)}–${hmToDisplayTime(e.endTime)}`
+                    : e.startTime ? hmToDisplayTime(e.startTime) : '';
+                return `<div class="sched-custom-event" onclick="event.stopPropagation()">
+                    <div class="sched-custom-event-name">${esc(e.name)}</div>
+                    ${timeRange ? `<div class="sched-custom-event-time">${timeRange}</div>` : ''}
+                    <button class="sched-custom-event-del" onclick="event.stopPropagation();deleteCustomEvent(${e.id})" aria-label="Delete event">✕</button>
+                </div>`;
+            }).join('');
+
+            if (scheduleEditing) {
+                return `<td class="editable" onclick="openScheduleSlot('${key}')">${evHtml}${customHtml}</td>`;
+            }
+            return `<td class="sched-clickable" onclick="openCustomEventFromCell('${cellDateStr}','${time}')">${evHtml}${customHtml}</td>`;
         }).join('');
         return `<tr><td>${time}</td>${cells}</tr>`;
     }).join('');
@@ -1195,7 +1305,11 @@ function renderCalendar() {
     const el = document.getElementById('calendarList');
     if (!el) return;
 
-    const all    = [...CBU_FALL_2026, ...state.calendarEvents];
+    const all    = [
+        ...CBU_FALL_2026,
+        ...state.calendarEvents,
+        ...state.customEvents.map(e => ({ ...e, label: e.name })),
+    ];
     const groups = groupCalByMonth(all);
 
     // "Next upcoming" banner
@@ -1239,7 +1353,7 @@ function renderCalendar() {
                     <span class="cal-cat-badge cat-${cat}">${esc(CAL_CAT_LABELS[e.category] || e.category)}</span>
                     <span class="cal-countdown ${cd.cls}">${cd.text}</span>
                     ${!e.builtin
-                        ? `<button class="btn btn-danger" onclick="deleteCalendarEvent(${e.id})" aria-label="Delete event">✕</button>`
+                        ? `<button class="btn btn-danger" onclick="deleteAnyEvent(${e.id})" aria-label="Delete event">✕</button>`
                         : `<span style="width:32px;flex-shrink:0"></span>`}
                 </div>`;
             }).join('')}
@@ -1267,12 +1381,14 @@ function addCalendarEvent() {
     document.getElementById('calEventEndDate').value  = '';
     document.getElementById('calEventCategory').value = 'personal';
     renderCalendar();
+    renderSchedule();
 }
 
 function deleteCalendarEvent(id) {
     state.calendarEvents = state.calendarEvents.filter(e => e.id !== id);
     save('calendarEvents', state.calendarEvents);
     renderCalendar();
+    renderSchedule();
 }
 
 // ── Calendar Grid ─────────────────────────────
@@ -1288,7 +1404,11 @@ const DOW_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
 // Build a map from dateStr → [events] expanding multi-day ranges
 function buildDayEventMap() {
-    const all = [...CBU_FALL_2026, ...state.calendarEvents];
+    const all = [
+        ...CBU_FALL_2026,
+        ...state.calendarEvents,
+        ...state.customEvents.map(e => ({ ...e, label: e.name })),
+    ];
     const map = {};
     all.forEach(e => {
         const add = ds => { (map[ds] = map[ds] || []).push(e); };
@@ -1698,6 +1818,14 @@ function bindEvents() {
         if (e.key === 'Enter') addProject();
     });
 
+    // Schedule custom event modal
+    document.getElementById('closeSchedCustomModal')?.addEventListener('click',  () => closeModal('schedCustomEventModal'));
+    document.getElementById('cancelSchedCustomModal')?.addEventListener('click', () => closeModal('schedCustomEventModal'));
+    document.getElementById('saveSchedCustomEvent')?.addEventListener('click', saveCustomEvent);
+    document.getElementById('schedCustomEventName')?.addEventListener('keydown', e => {
+        if (e.key === 'Enter') saveCustomEvent();
+    });
+
     // Schedule navigation
     document.getElementById('prevWeekBtn')?.addEventListener('click', () => { scheduleWeekOffset--; renderSchedule(); });
     document.getElementById('nextWeekBtn')?.addEventListener('click', () => { scheduleWeekOffset++; renderSchedule(); });
@@ -1781,7 +1909,7 @@ function bindEvents() {
     });
 
     // Close modals on backdrop click
-    ['canvasModal', 'projectModal', 'scheduleModal', 'thesisLinkModal', 'calEventModal'].forEach(id => {
+    ['canvasModal', 'projectModal', 'scheduleModal', 'schedCustomEventModal', 'thesisLinkModal', 'calEventModal'].forEach(id => {
         document.getElementById(id)?.addEventListener('click', e => {
             if (e.target === document.getElementById(id)) closeModal(id);
         });
@@ -1790,7 +1918,7 @@ function bindEvents() {
     // Close modals on Escape key
     document.addEventListener('keydown', e => {
         if (e.key === 'Escape') {
-            ['canvasModal', 'projectModal', 'scheduleModal', 'thesisLinkModal', 'calEventModal'].forEach(id => {
+            ['canvasModal', 'projectModal', 'scheduleModal', 'schedCustomEventModal', 'thesisLinkModal', 'calEventModal'].forEach(id => {
                 if (document.getElementById(id)?.classList.contains('open')) closeModal(id);
             });
         }
