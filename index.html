@@ -130,11 +130,50 @@
 
             <!-- Studio Projects -->
             <section id="studio" class="section">
-                <div class="section-header">
-                    <h2>Studio Projects</h2>
-                    <button class="btn btn-primary" id="addProjectBtn">+ New Project</button>
+                <!-- Overview: 4 fixed project cards -->
+                <div id="studioOverview">
+                    <div class="section-header">
+                        <h2>Studio Projects</h2>
+                    </div>
+                    <div class="projects-grid" id="studioOverviewGrid"></div>
                 </div>
-                <div class="projects-grid" id="projectsGrid"></div>
+
+                <!-- Project detail view -->
+                <div id="studioDetail" style="display:none">
+                    <div class="section-header" style="gap:12px">
+                        <button class="btn btn-ghost" id="studioBackBtn">← Back</button>
+                        <h2 id="studioDetailTitle"></h2>
+                    </div>
+
+                    <!-- Critique Notes -->
+                    <div class="studio-panel">
+                        <div class="studio-panel-title">Critique Notes</div>
+                        <div class="studio-note-input-row">
+                            <textarea id="studioNoteInput" class="input-field textarea" placeholder="Add a critique note… (Ctrl+Enter to save)" rows="2" style="min-height:64px"></textarea>
+                            <button class="btn btn-primary" id="studioAddNoteBtn">Add Note</button>
+                        </div>
+                        <div id="studioNotesList"></div>
+                    </div>
+
+                    <!-- Files -->
+                    <div class="studio-panel">
+                        <div class="studio-panel-title">Files</div>
+                        <div id="studioFilesContent"></div>
+                        <div id="studioUploadProgress"></div>
+                        <div id="studioFilesList"></div>
+                    </div>
+
+                    <!-- Timeline Deliverables -->
+                    <div class="studio-panel">
+                        <div class="studio-panel-title">Timeline Deliverables</div>
+                        <div class="studio-deliverable-input-row">
+                            <input type="text" id="studioDeliverableName" class="input-field" placeholder="Deliverable name…">
+                            <input type="date" id="studioDeliverableDate" class="input-field" style="max-width:160px">
+                            <button class="btn btn-primary" id="studioAddDeliverableBtn">Add</button>
+                        </div>
+                        <div id="studioDeliverablesList"></div>
+                    </div>
+                </div>
             </section>
 
             <!-- Weekly Schedule -->
@@ -334,48 +373,6 @@
             <div class="modal-footer">
                 <button class="btn btn-ghost" id="cancelCanvasModal">Cancel</button>
                 <button class="btn btn-primary" id="saveCanvasSettings">Save Settings</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Add Project Modal -->
-    <div class="modal-overlay" id="projectModal" role="dialog" aria-modal="true" aria-labelledby="projectModalTitle">
-        <div class="modal">
-            <div class="modal-header">
-                <h3 id="projectModalTitle">New Studio Project</h3>
-                <button class="modal-close" id="closeProjectModal" aria-label="Close">✕</button>
-            </div>
-            <div class="modal-body">
-                <div class="form-group">
-                    <label for="projectName">Project Name</label>
-                    <input type="text" id="projectName" class="input-field" placeholder="e.g. Urban Housing Studio">
-                </div>
-                <div class="form-group">
-                    <label for="projectCourse">Course</label>
-                    <input type="text" id="projectCourse" class="input-field" placeholder="e.g. ARCH 401">
-                </div>
-                <div class="form-group">
-                    <label for="projectPhase">Current Phase</label>
-                    <select id="projectPhase" class="select-field">
-                        <option value="concept">Concept</option>
-                        <option value="schematic">Schematic Design</option>
-                        <option value="dd">Design Development</option>
-                        <option value="cd">Construction Documents</option>
-                        <option value="final">Final Presentation</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label for="projectDue">Due Date</label>
-                    <input type="date" id="projectDue" class="input-field">
-                </div>
-                <div class="form-group">
-                    <label for="projectDesc">Description</label>
-                    <textarea id="projectDesc" class="input-field textarea" placeholder="Brief project description…"></textarea>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-ghost" id="cancelProjectModal">Cancel</button>
-                <button class="btn btn-primary" id="saveProjectBtn">Add Project</button>
             </div>
         </div>
     </div>

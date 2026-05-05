@@ -6,7 +6,6 @@
 // ── State ─────────────────────────────────────
 const state = {
     todos: [],
-    projects: [],
     notes: [],
     schedule: {},
     canvasSettings: { url: '', token: '' },
@@ -48,7 +47,6 @@ function esc(str) {
 // ── Init ──────────────────────────────────────
 function init() {
     state.todos          = load('todos', []);
-    state.projects       = load('projects', []);
     state.notes          = load('notes', []);
     state.schedule       = load('schedule', {});
     state.canvasSettings = load('canvasSettings', { url: '', token: '' });
@@ -66,7 +64,7 @@ function init() {
     initBannerImages();
     renderAssignments();
     renderTodos();
-    renderProjects();
+    renderStudioOverview();
     renderSchedule();
     renderNotes();
     renderThesisNotes();
@@ -228,6 +226,14 @@ function showSection(id) {
 
     if (id === 'files')    renderFiles();
     if (id === 'settings') renderSettingsSection();
+    if (id === 'studio') {
+        currentProjectId = null;
+        const ov = document.getElementById('studioOverview');
+        const dt = document.getElementById('studioDetail');
+        if (ov) ov.style.display = '';
+        if (dt) dt.style.display = 'none';
+        renderStudioOverview();
+    }
 }
 
 // ── Canvas API ───────────────────────────────
@@ -444,111 +450,316 @@ function renderTodos() {
 }
 
 // ── Studio Projects ───────────────────────────
-const PHASES = ['concept', 'schematic', 'dd', 'cd', 'final'];
-const PHASE_LABELS = {
-    concept:   'Concept',
-    schematic: 'Schematic',
-    dd:        'Design Dev',
-    cd:        'Const. Docs',
-    final:     'Final',
-};
 
-function phaseProgress(phase) {
-    const i = PHASES.indexOf(phase);
-    return Math.round(((i + 1) / PHASES.length) * 100);
+const PROJECT_NAMES = ['Project 1', 'Project 2', 'Project 3', 'Project 4'];
+let currentProjectId = null;
+
+function getProjectData(n) {
+    try {
+        const raw = localStorage.getItem(`cbu_project_${n}`);
+        return raw ? JSON.parse(raw) : { notes: [], files: [], deliverables: [] };
+    } catch { return { notes: [], files: [], deliverables: [] }; }
 }
 
-function addProject() {
-    const name = document.getElementById('projectName').value.trim();
-    if (!name) {
-        document.getElementById('projectName').focus();
-        return;
-    }
-    state.projects.push({
-        id:          Date.now(),
-        name,
-        course:      document.getElementById('projectCourse').value.trim(),
-        phase:       document.getElementById('projectPhase').value,
-        dueDate:     document.getElementById('projectDue').value,
-        description: document.getElementById('projectDesc').value.trim(),
-        createdAt:   new Date().toISOString(),
-    });
-    save('projects', state.projects);
-    closeModal('projectModal');
-    clearProjectForm();
-    renderProjects();
+function saveProjectData(n, data) {
+    try {
+        localStorage.setItem(`cbu_project_${n}`, JSON.stringify(data));
+    } catch (e) { console.warn('localStorage write failed:', e); }
 }
 
-function advancePhase(id) {
-    const p = state.projects.find(x => x.id === id);
-    if (!p) return;
-    const i = PHASES.indexOf(p.phase);
-    if (i < PHASES.length - 1) {
-        p.phase = PHASES[i + 1];
-        save('projects', state.projects);
-        renderProjects();
-    }
-}
-
-function deleteProject(id) {
-    if (!confirm('Remove this project?')) return;
-    state.projects = state.projects.filter(p => p.id !== id);
-    save('projects', state.projects);
-    renderProjects();
-}
-
-function renderProjects() {
-    const el = document.getElementById('projectsGrid');
+function renderStudioOverview() {
+    const el = document.getElementById('studioOverviewGrid');
     if (!el) return;
-
-    if (!state.projects.length) {
-        el.innerHTML = `<div class="empty-state" style="grid-column:1/-1">
-            <div class="empty-state-icon">🏗</div>
-            <div class="empty-state-text">No studio projects yet. Click "+ New Project" to add one.</div>
-        </div>`;
-        return;
-    }
-
-    el.innerHTML = state.projects.map(p => {
-        const progress = phaseProgress(p.phase);
-        const phaseIdx = PHASES.indexOf(p.phase);
-        const steps    = PHASES.map((ph, i) => {
-            const cls = i < phaseIdx ? 'done' : i === phaseIdx ? 'active' : '';
-            return `<span class="phase-step ${cls}">${PHASE_LABELS[ph]}</span>`;
-        }).join('');
-        const due = p.dueDate
-            ? new Date(`${p.dueDate}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-            : null;
-
+    el.innerHTML = PROJECT_NAMES.map((name, i) => {
+        const n    = i + 1;
+        const data = getProjectData(n);
+        const nc   = data.notes.length;
+        const fc   = data.files.length;
+        const dc   = data.deliverables.length;
         return `
         <div class="project-card">
             <div class="project-card-header">
-                <div>
-                    <div class="project-name">${esc(p.name)}</div>
-                    <div class="project-course">${esc(p.course)}</div>
-                </div>
-                <button class="btn btn-danger" onclick="deleteProject(${p.id})" aria-label="Remove project">✕</button>
+                <div class="project-name">${esc(name)}</div>
+                <button class="btn btn-primary" style="font-size:12px;padding:5px 12px"
+                    onclick="openProject(${n})">Open →</button>
             </div>
-            <div class="phase-stepper">${steps}</div>
-            <div class="progress-bar">
-                <div class="progress-fill" style="width:${progress}%"></div>
-            </div>
-            ${p.description ? `<p class="project-desc">${esc(p.description)}</p>` : ''}
-            <div class="project-footer">
-                <span class="project-due">${due ? `Due: ${due}` : ''}</span>
-                ${phaseIdx < PHASES.length - 1
-                    ? `<button class="btn btn-ghost" style="font-size:12px;padding:5px 10px" onclick="advancePhase(${p.id})">Next Phase →</button>`
-                    : `<span class="badge badge-submitted">Complete ✓</span>`}
+            <div class="project-overview-stats">
+                <span class="project-stat">${nc} note${nc !== 1 ? 's' : ''}</span>
+                <span class="project-stat">${fc} file${fc !== 1 ? 's' : ''}</span>
+                <span class="project-stat">${dc} deliverable${dc !== 1 ? 's' : ''}</span>
             </div>
         </div>`;
     }).join('');
 }
 
-function clearProjectForm() {
-    ['projectName', 'projectCourse', 'projectDue', 'projectDesc'].forEach(id => {
-        document.getElementById(id).value = '';
+function openProject(n) {
+    currentProjectId = n;
+    document.getElementById('studioOverview').style.display = 'none';
+    document.getElementById('studioDetail').style.display   = '';
+    document.getElementById('studioDetailTitle').textContent = PROJECT_NAMES[n - 1];
+    renderStudioNotes();
+    renderStudioFiles();
+    renderStudioDeliverables();
+}
+
+function closeProject() {
+    currentProjectId = null;
+    document.getElementById('studioOverview').style.display = '';
+    document.getElementById('studioDetail').style.display   = 'none';
+    renderStudioOverview();
+}
+
+// ── Critique Notes ────────────────────────────
+
+function addStudioNote() {
+    const input = document.getElementById('studioNoteInput');
+    const text  = input?.value.trim();
+    if (!text || !currentProjectId) return;
+    const data = getProjectData(currentProjectId);
+    data.notes.unshift({ id: Date.now(), text, createdAt: new Date().toISOString() });
+    saveProjectData(currentProjectId, data);
+    input.value = '';
+    renderStudioNotes();
+}
+
+function deleteStudioNote(id) {
+    const data = getProjectData(currentProjectId);
+    data.notes = data.notes.filter(n => n.id !== id);
+    saveProjectData(currentProjectId, data);
+    renderStudioNotes();
+}
+
+function renderStudioNotes() {
+    const el = document.getElementById('studioNotesList');
+    if (!el) return;
+    const data = getProjectData(currentProjectId);
+    if (!data.notes.length) {
+        el.innerHTML = `<div class="empty-state" style="padding:28px 20px">
+            <div class="empty-state-icon">📝</div>
+            <div class="empty-state-text">No critique notes yet. Add one above.</div>
+        </div>`;
+        return;
+    }
+    el.innerHTML = data.notes.map(n => `
+        <div class="note-card" style="margin-bottom:10px">
+            <div style="font-size:13px;line-height:1.6;color:var(--text-1);white-space:pre-wrap">${esc(n.text)}</div>
+            <div class="note-divider" style="margin:8px 0"></div>
+            <div class="note-footer">
+                <span class="note-date">${fmtNoteDate(n.createdAt)}</span>
+                <button class="btn btn-danger" onclick="deleteStudioNote(${n.id})">Delete</button>
+            </div>
+        </div>`
+    ).join('');
+}
+
+// ── Project Files ─────────────────────────────
+
+function renderStudioFiles() {
+    const contentEl = document.getElementById('studioFilesContent');
+    if (!contentEl) return;
+    if (!getDropboxToken()) {
+        contentEl.innerHTML = `<div style="display:flex;align-items:center;gap:12px;padding:6px 0 14px">
+            <span style="font-size:13px;color:var(--text-2)">Connect Dropbox in Settings to upload files.</span>
+            <button class="btn btn-ghost" style="font-size:12px" onclick="showSection('settings')">Connect →</button>
+        </div>`;
+    } else {
+        contentEl.innerHTML = `
+        <div class="files-upload-area" style="margin-bottom:12px">
+            <div class="files-drop-zone" id="studioDropZone">
+                <span class="files-drop-icon">☁</span>
+                <span>Drop files here to upload to Dropbox</span>
+            </div>
+            <label class="btn btn-ghost" for="studioUploadInput" style="cursor:pointer">↑ Upload File</label>
+            <input type="file" id="studioUploadInput" multiple style="display:none" aria-label="Upload files">
+        </div>`;
+        bindStudioUpload();
+    }
+    renderStudioFilesList();
+}
+
+function renderStudioFilesList() {
+    const el = document.getElementById('studioFilesList');
+    if (!el) return;
+    const data = getProjectData(currentProjectId);
+    if (!data.files.length) {
+        el.innerHTML = `<div class="empty-state" style="padding:24px 20px">
+            <div class="empty-state-icon">📁</div>
+            <div class="empty-state-text">No files uploaded yet.</div>
+        </div>`;
+        return;
+    }
+    el.innerHTML = data.files.map(f => {
+        const ext  = (f.name.split('.').pop() || '').toLowerCase();
+        const icon = FILE_ICONS[ext] || '📄';
+        return `
+        <div class="pdf-item">
+            <span class="pdf-icon">${icon}</span>
+            <div class="pdf-info">
+                <div class="pdf-name">${esc(f.name)}</div>
+                <div class="pdf-meta">${fmtFileSize(f.size)} · ${fmtNoteDate(f.uploadedAt)}</div>
+            </div>
+            <div class="pdf-actions">
+                <button class="btn btn-ghost" style="font-size:12px;padding:5px 10px"
+                    onclick="downloadStudioFile(${f.id})">↓ Download</button>
+                <button class="btn btn-danger" onclick="deleteStudioFile(${f.id})" aria-label="Remove">✕</button>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function downloadStudioFile(id) {
+    const data = getProjectData(currentProjectId);
+    const file = data.files.find(f => f.id === id);
+    if (file) downloadDropboxFile(file.path, file.name, null);
+}
+
+function deleteStudioFile(id) {
+    const data = getProjectData(currentProjectId);
+    data.files = data.files.filter(f => f.id !== id);
+    saveProjectData(currentProjectId, data);
+    renderStudioFilesList();
+}
+
+function bindStudioUpload() {
+    const dropZone  = document.getElementById('studioDropZone');
+    const fileInput = document.getElementById('studioUploadInput');
+    if (!dropZone || !fileInput) return;
+
+    dropZone.addEventListener('dragenter', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+    dropZone.addEventListener('dragover',  e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+    dropZone.addEventListener('dragleave', e => {
+        if (!dropZone.contains(e.relatedTarget)) dropZone.classList.remove('dragover');
     });
-    document.getElementById('projectPhase').value = 'concept';
+    dropZone.addEventListener('drop', e => {
+        e.preventDefault();
+        dropZone.classList.remove('dragover');
+        const files = e.dataTransfer?.files;
+        if (files?.length) handleStudioUpload(files);
+    });
+    fileInput.addEventListener('change', e => {
+        if (e.target.files?.length) handleStudioUpload(e.target.files);
+        e.target.value = '';
+    });
+}
+
+async function handleStudioUpload(files) {
+    if (!getDropboxToken() || !currentProjectId) return;
+    const fileArray = Array.from(files).filter(f => f.size >= 0);
+    if (!fileArray.length) return;
+
+    const progressEl = document.getElementById('studioUploadProgress');
+    if (!progressEl) return;
+
+    const ts         = Date.now();
+    const items      = fileArray.map((file, i) => ({ file, uid: `stu-${ts}-${i}`, id: ts + i }));
+    const folderPath = `/CBU Dashboard/Project ${currentProjectId}`;
+
+    progressEl.innerHTML = `<div class="files-upload-block" style="margin-bottom:12px">
+        ${items.map(item => `
+        <div class="files-upload-item">
+            <span class="files-upload-name" title="${esc(item.file.name)}">${esc(item.file.name)}</span>
+            <div class="files-upload-bar-wrap">
+                <div class="files-upload-bar" id="${item.uid}-bar" style="width:0%"></div>
+            </div>
+            <span class="files-upload-status" id="${item.uid}-status">0%</span>
+        </div>`).join('')}
+    </div>`;
+
+    await Promise.allSettled(items.map(async item => {
+        const barEl    = document.getElementById(`${item.uid}-bar`);
+        const statusEl = document.getElementById(`${item.uid}-status`);
+        try {
+            const result = await uploadFileToDropbox(item.file, folderPath, pct => {
+                if (barEl)    barEl.style.width   = `${pct}%`;
+                if (statusEl) statusEl.textContent = `${pct}%`;
+            });
+            if (barEl)    barEl.style.width = '100%';
+            if (statusEl) { statusEl.textContent = '✓ Done'; statusEl.className = 'files-upload-status done'; }
+            const data = getProjectData(currentProjectId);
+            data.files.unshift({
+                id:         item.id,
+                name:       item.file.name,
+                path:       result.path_lower || `${folderPath.toLowerCase()}/${item.file.name.toLowerCase()}`,
+                size:       item.file.size,
+                uploadedAt: new Date().toISOString(),
+            });
+            saveProjectData(currentProjectId, data);
+            renderStudioFilesList();
+        } catch {
+            if (barEl)    { barEl.style.background = 'var(--red)'; barEl.style.width = '100%'; }
+            if (statusEl) { statusEl.textContent = '⚠ Failed'; statusEl.className = 'files-upload-status error'; }
+        }
+    }));
+
+    setTimeout(() => { if (progressEl) progressEl.innerHTML = ''; }, 2500);
+}
+
+// ── Timeline Deliverables ─────────────────────
+
+function addStudioDeliverable() {
+    const nameEl = document.getElementById('studioDeliverableName');
+    const dateEl = document.getElementById('studioDeliverableDate');
+    const name   = nameEl?.value.trim();
+    if (!name || !currentProjectId) return;
+    const data = getProjectData(currentProjectId);
+    data.deliverables.push({ id: Date.now(), name, dueDate: dateEl?.value || '', completed: false });
+    saveProjectData(currentProjectId, data);
+    nameEl.value = '';
+    if (dateEl) dateEl.value = '';
+    renderStudioDeliverables();
+}
+
+function toggleStudioDeliverable(id) {
+    const data = getProjectData(currentProjectId);
+    const del  = data.deliverables.find(d => d.id === id);
+    if (!del) return;
+    del.completed = !del.completed;
+    saveProjectData(currentProjectId, data);
+    renderStudioDeliverables();
+}
+
+function deleteStudioDeliverable(id) {
+    const data = getProjectData(currentProjectId);
+    data.deliverables = data.deliverables.filter(d => d.id !== id);
+    saveProjectData(currentProjectId, data);
+    renderStudioDeliverables();
+}
+
+function renderStudioDeliverables() {
+    const el = document.getElementById('studioDeliverablesList');
+    if (!el) return;
+    const data = getProjectData(currentProjectId);
+    if (!data.deliverables.length) {
+        el.innerHTML = `<div class="empty-state" style="padding:28px 20px">
+            <div class="empty-state-icon">📅</div>
+            <div class="empty-state-text">No deliverables yet. Add one above.</div>
+        </div>`;
+        return;
+    }
+    const sorted = [...data.deliverables].sort((a, b) => {
+        if (a.completed !== b.completed) return a.completed ? 1 : -1;
+        if (!a.dueDate && !b.dueDate) return 0;
+        if (!a.dueDate) return 1;
+        if (!b.dueDate) return -1;
+        return a.dueDate.localeCompare(b.dueDate);
+    });
+    el.innerHTML = sorted.map(d => {
+        const status  = d.dueDate ? assignmentStatus(d.dueDate + 'T23:59:59') : { label: 'No Date', cls: 'badge-upcoming' };
+        const fmtDate = d.dueDate
+            ? new Date(d.dueDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+            : '';
+        return `
+        <div class="todo-item${d.completed ? ' completed' : ''}">
+            <div class="todo-checkbox${d.completed ? ' checked' : ''}"
+                 onclick="toggleStudioDeliverable(${d.id})" role="checkbox"
+                 aria-checked="${d.completed}" tabindex="0"
+                 onkeydown="if(event.key==='Enter'||event.key===' ')toggleStudioDeliverable(${d.id})">
+            </div>
+            <span class="todo-text">${esc(d.name)}</span>
+            ${fmtDate ? `<span class="badge ${esc(status.cls)}" style="flex-shrink:0">${fmtDate}</span>` : ''}
+            <button class="btn btn-danger" onclick="deleteStudioDeliverable(${d.id})" aria-label="Delete">✕</button>
+        </div>`;
+    }).join('');
 }
 
 // ── Schedule ──────────────────────────────────
@@ -2004,13 +2215,15 @@ function bindEvents() {
         if (e.key === 'Enter') addTodo();
     });
 
-    // Projects
-    document.getElementById('addProjectBtn')?.addEventListener('click', () => openModal('projectModal'));
-    document.getElementById('closeProjectModal')?.addEventListener('click',  () => closeModal('projectModal'));
-    document.getElementById('cancelProjectModal')?.addEventListener('click', () => closeModal('projectModal'));
-    document.getElementById('saveProjectBtn')?.addEventListener('click', addProject);
-    document.getElementById('projectName')?.addEventListener('keydown', e => {
-        if (e.key === 'Enter') addProject();
+    // Studio projects
+    document.getElementById('studioBackBtn')?.addEventListener('click', closeProject);
+    document.getElementById('studioAddNoteBtn')?.addEventListener('click', addStudioNote);
+    document.getElementById('studioNoteInput')?.addEventListener('keydown', e => {
+        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) addStudioNote();
+    });
+    document.getElementById('studioAddDeliverableBtn')?.addEventListener('click', addStudioDeliverable);
+    document.getElementById('studioDeliverableName')?.addEventListener('keydown', e => {
+        if (e.key === 'Enter') addStudioDeliverable();
     });
 
     // Schedule — add event button
@@ -2107,7 +2320,7 @@ function bindEvents() {
     });
 
     // Close modals on backdrop click
-    ['canvasModal', 'projectModal', 'scheduleModal', 'schedCustomEventModal', 'thesisLinkModal', 'calEventModal'].forEach(id => {
+    ['canvasModal', 'scheduleModal', 'schedCustomEventModal', 'thesisLinkModal', 'calEventModal'].forEach(id => {
         document.getElementById(id)?.addEventListener('click', e => {
             if (e.target === document.getElementById(id)) closeModal(id);
         });
@@ -2116,7 +2329,7 @@ function bindEvents() {
     // Close modals on Escape key
     document.addEventListener('keydown', e => {
         if (e.key === 'Escape') {
-            ['canvasModal', 'projectModal', 'scheduleModal', 'schedCustomEventModal', 'thesisLinkModal', 'calEventModal'].forEach(id => {
+            ['canvasModal', 'scheduleModal', 'schedCustomEventModal', 'thesisLinkModal', 'calEventModal'].forEach(id => {
                 if (document.getElementById(id)?.classList.contains('open')) closeModal(id);
             });
         }
