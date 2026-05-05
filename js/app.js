@@ -210,6 +210,7 @@ const SECTION_TITLES = {
     calendar:    'Calendar',
     files:       'Files',
     settings:    'Settings',
+    claude:      'Claude',
 };
 
 function showSection(id) {
@@ -226,6 +227,10 @@ function showSection(id) {
 
     if (id === 'files')    renderFiles();
     if (id === 'settings') renderSettingsSection();
+    if (id === 'claude') {
+        document.getElementById('claudeModeSelect').style.display  = '';
+        document.getElementById('claudeInlineChat').style.display  = 'none';
+    }
     if (id === 'studio') {
         currentProjectId = null;
         const ov = document.getElementById('studioOverview');
@@ -2307,32 +2312,19 @@ function buildDashboardContext() {
     return lines.join('\n').trim();
 }
 
-function toggleClaudeMenu() {
-    const panel = document.getElementById('claudePanel');
-    if (panel?.classList.contains('open')) { closeClaudePanel(); return; }
-    document.getElementById('claudeMenu')?.classList.toggle('open');
-    document.getElementById('claudeFab')?.classList.toggle('active');
-}
-
-function closeClaudeMenu() {
-    document.getElementById('claudeMenu')?.classList.remove('open');
-    document.getElementById('claudeFab')?.classList.remove('active');
-}
-
 function openSimpleMode() {
-    closeClaudeMenu();
-    document.getElementById('claudePanel')?.classList.add('open');
+    document.getElementById('claudeModeSelect').style.display = 'none';
+    document.getElementById('claudeInlineChat').style.display = '';
     renderChatHistory();
-    setTimeout(() => document.getElementById('claudeChatInput')?.focus(), 120);
+    setTimeout(() => document.getElementById('claudeChatInput')?.focus(), 80);
 }
 
-function closeClaudePanel() {
-    document.getElementById('claudePanel')?.classList.remove('open');
-    document.getElementById('claudeFab')?.classList.remove('active');
+function backToClaudeMenu() {
+    document.getElementById('claudeModeSelect').style.display = '';
+    document.getElementById('claudeInlineChat').style.display = 'none';
 }
 
 async function openComplexMode() {
-    closeClaudeMenu();
     const ctx = `Here is my current CBU Dashboard context:\n\n${buildDashboardContext()}`;
     try {
         await navigator.clipboard.writeText(ctx);
@@ -2579,10 +2571,9 @@ function bindEvents() {
     });
 
     // Claude assistant
-    document.getElementById('claudeFab')?.addEventListener('click', toggleClaudeMenu);
     document.getElementById('claudeSimpleBtn')?.addEventListener('click', openSimpleMode);
     document.getElementById('claudeComplexBtn')?.addEventListener('click', openComplexMode);
-    document.getElementById('claudePanelClose')?.addEventListener('click', closeClaudePanel);
+    document.getElementById('claudeBackBtn')?.addEventListener('click', backToClaudeMenu);
     document.getElementById('claudeSendBtn')?.addEventListener('click', sendSimpleMessage);
     document.getElementById('claudeChatInput')?.addEventListener('keydown', e => {
         if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendSimpleMessage(); }
@@ -2591,9 +2582,6 @@ function bindEvents() {
         const ta = e.target;
         ta.style.height = '';
         ta.style.height = Math.min(ta.scrollHeight, 96) + 'px';
-    });
-    document.addEventListener('click', e => {
-        if (!e.target.closest('#claudeMenu') && !e.target.closest('#claudeFab')) closeClaudeMenu();
     });
 
     // Settings — Canvas (opens existing modal)
@@ -2632,8 +2620,6 @@ function bindEvents() {
             ['canvasModal', 'scheduleModal', 'schedCustomEventModal', 'thesisLinkModal', 'calEventModal'].forEach(id => {
                 if (document.getElementById(id)?.classList.contains('open')) closeModal(id);
             });
-            closeClaudeMenu();
-            closeClaudePanel();
         }
     });
 

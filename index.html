@@ -78,6 +78,17 @@
                     <span class="nav-icon">⚙</span> Settings
                 </a>
             </li>
+            <li>
+                <a href="#claude" class="nav-link nav-link-claude" data-section="claude">
+                    <span class="nav-icon">
+                        <svg viewBox="0 0 18 18" fill="none" width="14" height="14" aria-hidden="true">
+                            <line x1="9" y1="1.5" x2="9" y2="16.5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
+                            <line x1="15.39" y1="5" x2="2.61" y2="13" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
+                            <line x1="2.61" y1="5" x2="15.39" y2="13" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
+                        </svg>
+                    </span> Claude
+                </a>
+            </li>
         </ul>
         <div class="sidebar-footer">
             <button class="btn btn-ghost full-width" id="canvasSettingsBtn">⚙ Canvas Settings</button>
@@ -376,6 +387,44 @@
                 </div>
             </section>
 
+            <!-- Claude Assistant -->
+            <section id="claude" class="section">
+                <!-- Mode selection -->
+                <div id="claudeModeSelect">
+                    <div class="section-header">
+                        <h2>Claude Assistant</h2>
+                    </div>
+                    <div class="claude-mode-grid">
+                        <button class="claude-mode-card" id="claudeSimpleBtn">
+                            <div class="claude-mode-icon">⚡</div>
+                            <div class="claude-mode-name">Simple</div>
+                            <div class="claude-mode-desc">Quick questions answered by Claude Haiku directly in the dashboard. Requires an Anthropic API key in Settings.</div>
+                        </button>
+                        <button class="claude-mode-card" id="claudeComplexBtn">
+                            <div class="claude-mode-icon">✦</div>
+                            <div class="claude-mode-name">Complex</div>
+                            <div class="claude-mode-desc">Copies your full dashboard context to the clipboard and opens Claude.ai in a new tab.</div>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Inline Simple Mode chat -->
+                <div id="claudeInlineChat" style="display:none">
+                    <div class="section-header" style="gap:12px">
+                        <button class="btn btn-ghost" id="claudeBackBtn">← Back</button>
+                        <h2>Simple Mode</h2>
+                    </div>
+                    <div class="claude-inline-chat">
+                        <div class="claude-chat-history" id="claudeChatHistory"></div>
+                        <div class="claude-chat-input-row">
+                            <textarea class="claude-chat-input" id="claudeChatInput"
+                                placeholder="Ask about assignments, projects, deadlines…" rows="1"></textarea>
+                            <button class="claude-send-btn" id="claudeSendBtn" aria-label="Send">↑</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
         </div>
     </main>
 
@@ -520,45 +569,6 @@
                 <button class="btn btn-ghost" id="cancelSchedCustomModal">Cancel</button>
                 <button class="btn btn-primary" id="saveSchedCustomEvent">Add Event</button>
             </div>
-        </div>
-    </div>
-
-    <!-- Claude Assistant FAB -->
-    <button class="claude-fab" id="claudeFab" aria-label="Claude assistant">
-        <svg viewBox="0 0 24 24" fill="currentColor" width="21" height="21" aria-hidden="true">
-            <path d="M20 2H4C2.9 2 2 2.9 2 4v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/>
-        </svg>
-    </button>
-
-    <!-- Claude Popup Menu -->
-    <div class="claude-menu" id="claudeMenu" role="menu">
-        <button class="claude-menu-btn" id="claudeSimpleBtn" role="menuitem">
-            <span class="claude-menu-icon">⚡</span>
-            <div>
-                <div class="claude-menu-label">Simple</div>
-                <div class="claude-menu-sub">Quick questions · Haiku</div>
-            </div>
-        </button>
-        <button class="claude-menu-btn" id="claudeComplexBtn" role="menuitem">
-            <span class="claude-menu-icon">✦</span>
-            <div>
-                <div class="claude-menu-label">Complex</div>
-                <div class="claude-menu-sub">Open Claude.ai with context</div>
-            </div>
-        </button>
-    </div>
-
-    <!-- Claude Simple Chat Panel -->
-    <div class="claude-panel" id="claudePanel" aria-label="Claude chat">
-        <div class="claude-panel-header">
-            <span class="claude-panel-title">Claude — Simple Mode</span>
-            <button class="claude-panel-close" id="claudePanelClose" aria-label="Close chat">✕</button>
-        </div>
-        <div class="claude-chat-history" id="claudeChatHistory"></div>
-        <div class="claude-chat-input-row">
-            <textarea class="claude-chat-input" id="claudeChatInput"
-                placeholder="Ask about assignments, projects, deadlines…" rows="1"></textarea>
-            <button class="claude-send-btn" id="claudeSendBtn" aria-label="Send">↑</button>
         </div>
     </div>
 
