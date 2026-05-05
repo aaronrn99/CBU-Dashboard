@@ -315,6 +315,7 @@ async function syncCanvas() {
         state.assignments = allAssignments;
         save('assignments', allAssignments);
         renderAssignments();
+        syncCanvasAssignmentsToEvents(allAssignments);
 
         statusEl.className = 'canvas-status success';
         statusEl.textContent =
@@ -728,6 +729,26 @@ function deleteStudioDeliverable(id) {
     syncProjectDeliverablesToEvents(currentProjectId);
 }
 
+function syncCanvasAssignmentsToEvents(assignments) {
+    state.customEvents = state.customEvents.filter(e => e.source !== 'canvas');
+    assignments.forEach(a => {
+        if (!a.dueAt) return;
+        state.customEvents.push({
+            id:        a.id,
+            name:      a.title,
+            date:      a.dueAt.slice(0, 10),
+            startTime: '',
+            endTime:   '',
+            category:  'architecture',
+            source:    'canvas',
+            course:    a.course,
+        });
+    });
+    save('custom_events', state.customEvents);
+    renderCalendar();
+    renderSchedule();
+}
+
 function syncProjectDeliverablesToEvents(projectId) {
     const projectName = PROJECT_NAMES[projectId - 1];
     state.customEvents = state.customEvents.filter(
@@ -742,7 +763,7 @@ function syncProjectDeliverablesToEvents(projectId) {
             date:        d.dueDate,
             startTime:   '',
             endTime:     '',
-            category:    'deadline',
+            category:    'architecture',
             source:      'project',
             projectName,
             completed:   d.completed,
@@ -1602,7 +1623,7 @@ function renderCalendar() {
                     <span class="cal-label"${e.completed ? ' style="text-decoration:line-through;opacity:0.55"' : ''}>${esc(e.label)}</span>
                     <span class="cal-cat-badge cat-${cat}">${esc(CAL_CAT_LABELS[e.category] || e.category)}</span>
                     <span class="cal-countdown ${cd.cls}">${cd.text}</span>
-                    ${!e.builtin && e.source !== 'project'
+                    ${!e.builtin && e.source !== 'project' && e.source !== 'canvas'
                         ? `<button class="btn btn-danger" onclick="deleteAnyEvent(${e.id})" aria-label="Delete event">✕</button>`
                         : `<span style="width:32px;flex-shrink:0"></span>`}
                 </div>`;
