@@ -707,6 +707,7 @@ function addStudioDeliverable() {
     nameEl.value = '';
     if (dateEl) dateEl.value = '';
     renderStudioDeliverables();
+    syncProjectDeliverablesToEvents(currentProjectId);
 }
 
 function toggleStudioDeliverable(id) {
@@ -716,6 +717,7 @@ function toggleStudioDeliverable(id) {
     del.completed = !del.completed;
     saveProjectData(currentProjectId, data);
     renderStudioDeliverables();
+    syncProjectDeliverablesToEvents(currentProjectId);
 }
 
 function deleteStudioDeliverable(id) {
@@ -723,6 +725,32 @@ function deleteStudioDeliverable(id) {
     data.deliverables = data.deliverables.filter(d => d.id !== id);
     saveProjectData(currentProjectId, data);
     renderStudioDeliverables();
+    syncProjectDeliverablesToEvents(currentProjectId);
+}
+
+function syncProjectDeliverablesToEvents(projectId) {
+    const projectName = PROJECT_NAMES[projectId - 1];
+    state.customEvents = state.customEvents.filter(
+        e => !(e.source === 'project' && e.projectName === projectName)
+    );
+    const data = getProjectData(projectId);
+    data.deliverables.forEach(d => {
+        if (!d.dueDate) return;
+        state.customEvents.push({
+            id:          d.id,
+            name:        d.name,
+            date:        d.dueDate,
+            startTime:   '',
+            endTime:     '',
+            category:    'deadline',
+            source:      'project',
+            projectName,
+            completed:   d.completed,
+        });
+    });
+    save('custom_events', state.customEvents);
+    renderCalendar();
+    renderSchedule();
 }
 
 function renderStudioDeliverables() {
@@ -1027,7 +1055,7 @@ function renderSchedule() {
     const todayStr = toDateStr(now);
 
     // All calendar events used for day-header indicators
-    const allCal = [...CBU_FALL_2026, ...state.calendarEvents];
+    const allCal = [...CBU_FALL_2026, ...state.calendarEvents, ...state.customEvents.map(e => ({ ...e, label: e.name }))];
 
     // ── Course-block coverage map ──────────────
     const timeIndex = {};
@@ -1060,7 +1088,8 @@ function renderSchedule() {
 
         const badges = dayEvents.slice(0, 2).map(e => {
             const label = e.label.length > 20 ? e.label.slice(0, 18) + '…' : e.label;
-            return `<div class="sched-day-badge cat-${esc(e.category)}">${esc(label)}</div>`;
+            const done  = e.completed ? ' style="text-decoration:line-through;opacity:0.55"' : '';
+            return `<div class="sched-day-badge cat-${esc(e.category)}"${done}>${esc(label)}</div>`;
         }).join('');
 
         return `<th class="${isToday ? 'sched-today-col' : ''}">
@@ -1570,10 +1599,10 @@ function renderCalendar() {
                 <div class="cal-event-row${isPast ? ' cal-past' : ''}">
                     <span class="cal-date">${formatCalDate(e.date, e.endDate)}</span>
                     <span class="cal-dot dot-${cat}"></span>
-                    <span class="cal-label">${esc(e.label)}</span>
+                    <span class="cal-label"${e.completed ? ' style="text-decoration:line-through;opacity:0.55"' : ''}>${esc(e.label)}</span>
                     <span class="cal-cat-badge cat-${cat}">${esc(CAL_CAT_LABELS[e.category] || e.category)}</span>
                     <span class="cal-countdown ${cd.cls}">${cd.text}</span>
-                    ${!e.builtin
+                    ${!e.builtin && e.source !== 'project'
                         ? `<button class="btn btn-danger" onclick="deleteAnyEvent(${e.id})" aria-label="Delete event">✕</button>`
                         : `<span style="width:32px;flex-shrink:0"></span>`}
                 </div>`;
