@@ -1441,6 +1441,94 @@ body {
 
 .files-suggested-child { margin-left: 22px; opacity: 0.75; }
 
+/* ── Files Upload Zone ──────────────────────── */
+.files-upload-area {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.files-drop-zone {
+    flex: 1;
+    border: 2px dashed var(--border);
+    border-radius: var(--radius);
+    padding: 14px 18px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--text-2);
+    font-size: 13px;
+    transition: border-color var(--ease), background var(--ease), color var(--ease);
+    user-select: none;
+}
+
+.files-drop-zone.dragover {
+    border-color: var(--green);
+    background: var(--green-dim);
+    color: var(--green);
+}
+
+.files-drop-icon {
+    font-size: 18px;
+    flex-shrink: 0;
+}
+
+.files-upload-progress {
+    margin-bottom: 12px;
+}
+
+.files-upload-block {
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px 14px;
+}
+
+.files-upload-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 5px 0;
+}
+
+.files-upload-name {
+    flex: 1;
+    font-size: 12.5px;
+    color: var(--text-1);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+}
+
+.files-upload-bar-wrap {
+    width: 100px;
+    height: 4px;
+    background: var(--bg-3);
+    border-radius: 2px;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+.files-upload-bar {
+    height: 100%;
+    background: var(--green);
+    border-radius: 2px;
+    transition: width 0.15s ease;
+}
+
+.files-upload-status {
+    font-size: 11px;
+    color: var(--text-3);
+    flex-shrink: 0;
+    min-width: 52px;
+    text-align: right;
+}
+
+.files-upload-status.done  { color: var(--green); }
+.files-upload-status.error { color: var(--red); }
+
 /* ── Settings ───────────────────────────────── */
 .settings-card {
     background: var(--bg-2);

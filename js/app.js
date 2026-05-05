@@ -1779,6 +1779,125 @@ async function downloadDropboxFile(path, name, btn) {
     }
 }
 
+// ── Dropbox Upload ────────────────────────────
+
+function uploadFileToDropbox(file, folderPath, onProgress) {
+    const token      = getDropboxToken();
+    const uploadPath = folderPath === '' ? `/${file.name}` : `${folderPath}/${file.name}`;
+
+    return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+
+        xhr.upload.addEventListener('progress', e => {
+            if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
+        });
+
+        xhr.addEventListener('load', () => {
+            if (xhr.status === 200) {
+                resolve(JSON.parse(xhr.responseText));
+            } else {
+                let msg = `Upload failed (${xhr.status})`;
+                try { const j = JSON.parse(xhr.responseText); msg = j.error_summary || j.user_message || msg; } catch {}
+                reject(new Error(msg));
+            }
+        });
+
+        xhr.addEventListener('error', () => reject(new Error('Network error during upload')));
+        xhr.addEventListener('abort', () => reject(new Error('Upload cancelled')));
+
+        xhr.open('POST', 'https://content.dropboxapi.com/2/files/upload');
+        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+        xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+        xhr.setRequestHeader('Dropbox-API-Arg', JSON.stringify({
+            path:       uploadPath,
+            mode:       'add',
+            autorename: true,
+            mute:       false,
+        }));
+
+        xhr.send(file);
+    });
+}
+
+async function handleDropboxUpload(files) {
+    if (!getDropboxToken()) return;
+    const fileArray = Array.from(files).filter(f => f.size >= 0);
+    if (!fileArray.length) return;
+
+    const progressEl = document.getElementById('filesUploadProgress');
+    if (!progressEl) return;
+
+    const ts    = Date.now();
+    const items = fileArray.map((file, i) => ({ file, uid: `up-${ts}-${i}` }));
+
+    progressEl.innerHTML = `<div class="files-upload-block">
+        ${items.map(item => `
+        <div class="files-upload-item">
+            <span class="files-upload-name" title="${esc(item.file.name)}">${esc(item.file.name)}</span>
+            <div class="files-upload-bar-wrap">
+                <div class="files-upload-bar" id="${item.uid}-bar" style="width:0%"></div>
+            </div>
+            <span class="files-upload-status" id="${item.uid}-status">0%</span>
+        </div>`).join('')}
+    </div>`;
+
+    const currentPath = filesPathStack[filesPathStack.length - 1].path;
+    let anyFailed = false;
+
+    await Promise.allSettled(items.map(async item => {
+        const barEl    = document.getElementById(`${item.uid}-bar`);
+        const statusEl = document.getElementById(`${item.uid}-status`);
+        try {
+            await uploadFileToDropbox(item.file, currentPath, pct => {
+                if (barEl)    barEl.style.width   = `${pct}%`;
+                if (statusEl) statusEl.textContent = `${pct}%`;
+            });
+            if (barEl)    barEl.style.width   = '100%';
+            if (statusEl) { statusEl.textContent = '✓ Done'; statusEl.className = 'files-upload-status done'; }
+        } catch (err) {
+            anyFailed = true;
+            if (barEl)    { barEl.style.background = 'var(--red)'; barEl.style.width = '100%'; }
+            if (statusEl) { statusEl.textContent = '⚠ Failed'; statusEl.className = 'files-upload-status error'; }
+            const grid = document.getElementById('filesGrid');
+            if (grid) {
+                const t = document.createElement('div');
+                t.className   = 'files-error-toast';
+                t.textContent = `⚠ Failed to upload "${item.file.name}": ${err.message}`;
+                grid.prepend(t);
+                setTimeout(() => t.remove(), 6000);
+            }
+        }
+    }));
+
+    setTimeout(() => {
+        if (progressEl) progressEl.innerHTML = '';
+        loadFilesFolder(filesPathStack[filesPathStack.length - 1].path);
+    }, anyFailed ? 3500 : 1500);
+}
+
+function bindFilesUpload() {
+    const dropZone  = document.getElementById('filesDropZone');
+    const fileInput = document.getElementById('filesUploadInput');
+    if (!dropZone || !fileInput) return;
+
+    dropZone.addEventListener('dragenter', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+    dropZone.addEventListener('dragover',  e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+    dropZone.addEventListener('dragleave', e => {
+        if (!dropZone.contains(e.relatedTarget)) dropZone.classList.remove('dragover');
+    });
+    dropZone.addEventListener('drop', e => {
+        e.preventDefault();
+        dropZone.classList.remove('dragover');
+        const files = e.dataTransfer?.files;
+        if (files?.length) handleDropboxUpload(files);
+    });
+
+    fileInput.addEventListener('change', e => {
+        if (e.target.files?.length) handleDropboxUpload(e.target.files);
+        e.target.value = '';
+    });
+}
+
 // ── Settings ──────────────────────────────────
 
 function renderSettingsSection() {
@@ -2002,6 +2121,9 @@ function bindEvents() {
             });
         }
     });
+
+    // Files drag-and-drop upload
+    bindFilesUpload();
 }
 
 function closeSidebar() {

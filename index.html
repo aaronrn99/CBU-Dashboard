@@ -249,6 +249,15 @@
 
                 <!-- Token set: Dropbox file browser -->
                 <div id="filesBrowser" style="display:none">
+                    <div class="files-upload-area">
+                        <div class="files-drop-zone" id="filesDropZone">
+                            <span class="files-drop-icon">☁</span>
+                            <span>Drop files here to upload to Dropbox</span>
+                        </div>
+                        <label class="btn btn-ghost" for="filesUploadInput" style="cursor:pointer">↑ Upload File</label>
+                        <input type="file" id="filesUploadInput" multiple style="display:none" aria-label="Upload files to Dropbox">
+                    </div>
+                    <div id="filesUploadProgress"></div>
                     <div class="files-breadcrumb" id="filesBreadcrumb"></div>
                     <div class="files-grid" id="filesGrid"></div>
                 </div>
