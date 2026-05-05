@@ -385,6 +385,45 @@
                         <p class="form-hint" style="margin-top:8px">Your key is stored only in this browser's <code>localStorage</code> and is sent only to Anthropic's servers.</p>
                     </details>
                 </div>
+
+                <!-- API Credits card -->
+                <div class="settings-card">
+                    <div class="settings-card-header">
+                        <h3>API Credits</h3>
+                        <div class="clawd-wrapper" aria-hidden="true">
+                            <div class="clawd" id="clawdMascot">
+                                <div class="clawd-arm clawd-arm-left"></div>
+                                <div class="clawd-arm clawd-arm-right"></div>
+                                <div class="clawd-body">
+                                    <div class="clawd-eye clawd-eye-left"></div>
+                                    <div class="clawd-eye clawd-eye-right"></div>
+                                </div>
+                                <div class="clawd-leg clawd-leg-left"></div>
+                                <div class="clawd-leg clawd-leg-right"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <p class="settings-description">Track Anthropic API usage for Claude Simple Mode. Balance is deducted automatically after each message.</p>
+                    <div class="api-credits-inputs">
+                        <div class="form-group">
+                            <label for="apiBalanceInput">Current balance ($)</label>
+                            <input type="number" id="apiBalanceInput" class="input-field" step="0.01" min="0" placeholder="0.00">
+                        </div>
+                        <div class="form-group">
+                            <label for="apiWarningInput">Warning threshold ($)</label>
+                            <input type="number" id="apiWarningInput" class="input-field" step="0.01" min="0" placeholder="2.00">
+                        </div>
+                        <div class="form-group">
+                            <label for="apiReloadInput">Auto-reload amount ($)</label>
+                            <input type="number" id="apiReloadInput" class="input-field" step="0.01" min="0" placeholder="15.00">
+                        </div>
+                    </div>
+                    <div class="settings-actions">
+                        <button class="btn btn-primary" id="saveApiCreditsBtn">Save</button>
+                    </div>
+                    <div class="settings-status" id="apiCreditsStatus"></div>
+                    <div id="apiCreditDisplay"></div>
+                </div>
             </section>
 
             <!-- Claude Assistant -->
@@ -427,6 +466,38 @@
 
         </div>
     </main>
+
+    <!-- API Warning Modal -->
+    <div class="modal-overlay" id="apiWarningModal" role="dialog" aria-modal="true" aria-labelledby="apiWarningTitle">
+        <div class="modal api-warning-modal">
+            <button class="modal-close" id="closeApiWarningModal" aria-label="Close" style="position:absolute;top:12px;right:14px">✕</button>
+            <div class="api-warning-clawd-wrap" aria-hidden="true">
+                <div class="clawd" id="apiWarnClawd">
+                    <div class="clawd-arm clawd-arm-left"></div>
+                    <div class="clawd-arm clawd-arm-right"></div>
+                    <div class="clawd-body">
+                        <div class="clawd-eye clawd-eye-left"></div>
+                        <div class="clawd-eye clawd-eye-right"></div>
+                    </div>
+                    <div class="clawd-leg clawd-leg-left"></div>
+                    <div class="clawd-leg clawd-leg-right"></div>
+                </div>
+            </div>
+            <div class="api-warning-header">
+                <span class="api-warning-icon">⚠</span>
+                <h3 id="apiWarningTitle">You're about to hit your minimum API token amount</h3>
+            </div>
+            <div class="modal-body" style="text-align:center;padding-top:0">
+                <div class="api-balance-badge" id="apiWarnBalanceBadge">$0.00</div>
+                <p style="font-size:14px;line-height:1.6;color:var(--text-1);margin:12px 0 8px">Do you still want to proceed with this request?</p>
+                <p style="font-size:12px;color:var(--text-3);line-height:1.5">Your auto-reload amount is set to $<span id="apiWarnReloadAmt">15.00</span>, reloaded once your account reaches $1.</p>
+            </div>
+            <div class="modal-footer" style="justify-content:center;gap:12px">
+                <button class="btn btn-ghost" id="apiWarningCancel">Cancel</button>
+                <button class="btn btn-primary" id="apiWarningContinue">Yes, continue</button>
+            </div>
+        </div>
+    </div>
 
     <!-- Canvas Settings Modal -->
     <div class="modal-overlay" id="canvasModal" role="dialog" aria-modal="true" aria-labelledby="canvasModalTitle">

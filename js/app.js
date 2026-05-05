@@ -2193,6 +2193,19 @@ function renderSettingsSection() {
         aStatus.className   = `settings-status${aKey ? ' settings-status-saved' : ''}`;
         aStatus.textContent = aKey ? '✓ API key saved' : '';
     }
+
+    // API Credits
+    const apiBalance  = parseFloat(localStorage.getItem('cbu_api_balance')  || '0');
+    const apiWarning  = parseFloat(localStorage.getItem('cbu_api_warning')  || '2');
+    const apiReload   = parseFloat(localStorage.getItem('cbu_api_reload')   || '15');
+    const balInput    = document.getElementById('apiBalanceInput');
+    const warnInput   = document.getElementById('apiWarningInput');
+    const reloadInput = document.getElementById('apiReloadInput');
+    if (balInput)    balInput.value    = apiBalance > 0 ? apiBalance.toFixed(2) : '';
+    if (warnInput)   warnInput.value   = apiWarning.toFixed(2);
+    if (reloadInput) reloadInput.value = apiReload.toFixed(2);
+    renderApiCreditSection();
+    startClawdLoopIfNeeded();
 }
 
 function setDropboxStatus(cls, msg) {
@@ -2373,6 +2386,14 @@ async function sendSimpleMessage() {
         return;
     }
 
+    // Balance warning check
+    const _curBal  = parseFloat(localStorage.getItem('cbu_api_balance')  || '0');
+    const _warnThr = parseFloat(localStorage.getItem('cbu_api_warning') || '2');
+    if (_curBal > 0 && _curBal <= _warnThr) {
+        const _proceed = await showApiWarningModal();
+        if (!_proceed) return;
+    }
+
     input.value = '';
     input.style.height = '';
     sendBtn.disabled = true;
@@ -2417,6 +2438,21 @@ async function sendSimpleMessage() {
         }
 
         const data  = await res.json();
+        // Deduct API cost from tracked balance
+        if (data.usage) {
+            const _iT  = data.usage.input_tokens  || 0;
+            const _oT  = data.usage.output_tokens || 0;
+            const _c   = (_iT / 1e6) * 0.80 + (_oT / 1e6) * 4.00;
+            const _pI  = parseInt(localStorage.getItem('cbu_api_tokens_input')  || '0');
+            const _pO  = parseInt(localStorage.getItem('cbu_api_tokens_output') || '0');
+            localStorage.setItem('cbu_api_tokens_input',  String(_pI + _iT));
+            localStorage.setItem('cbu_api_tokens_output', String(_pO + _oT));
+            const _b = parseFloat(localStorage.getItem('cbu_api_balance') || '0');
+            if (_b > 0) {
+                localStorage.setItem('cbu_api_balance', String(Math.max(0, _b - _c)));
+                if (document.getElementById('settings')?.classList.contains('active')) renderApiCreditSection();
+            }
+        }
         const reply = data.content?.[0]?.text || '(empty response)';
         claudeHistory.push({ role: 'assistant', content: reply });
         renderChatHistory();
@@ -2428,6 +2464,114 @@ async function sendSimpleMessage() {
         sendBtn.disabled = false;
         input?.focus();
     }
+}
+
+// ── API Credit Tracker ────────────────────────
+
+let _apiWarnResolve    = null;
+let _clawdLoopStarted  = false;
+
+function resolveApiWarning(proceed) {
+    closeModal('apiWarningModal');
+    closeApiWarningAnimations();
+    if (_apiWarnResolve) { _apiWarnResolve(proceed); _apiWarnResolve = null; }
+}
+
+function showApiWarningModal() {
+    return new Promise(resolve => {
+        _apiWarnResolve = resolve;
+        const reload   = parseFloat(localStorage.getItem('cbu_api_reload')   || '15').toFixed(2);
+        const balance  = parseFloat(localStorage.getItem('cbu_api_balance')  || '0').toFixed(2);
+        const reloadEl = document.getElementById('apiWarnReloadAmt');
+        const balEl    = document.getElementById('apiWarnBalanceBadge');
+        const mascot   = document.getElementById('apiWarnClawd');
+        if (reloadEl) reloadEl.textContent = reload;
+        if (balEl)    balEl.textContent    = '$' + balance;
+        if (mascot)   mascot.classList.add('clawd-alarmed');
+        openModal('apiWarningModal');
+    });
+}
+
+function closeApiWarningAnimations() {
+    const mascot = document.getElementById('apiWarnClawd');
+    if (mascot) mascot.classList.remove('clawd-alarmed');
+}
+
+function saveApiCredits() {
+    const bal     = Math.max(0, parseFloat(document.getElementById('apiBalanceInput')?.value  || '0'));
+    const warning = Math.max(0, parseFloat(document.getElementById('apiWarningInput')?.value  || '2'));
+    const reload  = Math.max(0, parseFloat(document.getElementById('apiReloadInput')?.value   || '15'));
+    localStorage.setItem('cbu_api_balance',          String(bal));
+    localStorage.setItem('cbu_api_starting_balance', String(bal));
+    localStorage.setItem('cbu_api_warning',          String(warning));
+    localStorage.setItem('cbu_api_reload',           String(reload));
+    localStorage.setItem('cbu_api_tokens_input',  '0');
+    localStorage.setItem('cbu_api_tokens_output', '0');
+    const status = document.getElementById('apiCreditsStatus');
+    if (status) { status.className = 'settings-status settings-status-saved'; status.textContent = '✓ Saved'; }
+    renderApiCreditSection();
+}
+
+function renderApiCreditSection() {
+    const el = document.getElementById('apiCreditDisplay');
+    if (!el) return;
+    const balance  = parseFloat(localStorage.getItem('cbu_api_balance')          || '0');
+    const starting = parseFloat(localStorage.getItem('cbu_api_starting_balance') || '0');
+    const warning  = parseFloat(localStorage.getItem('cbu_api_warning')          || '2');
+    const reload   = parseFloat(localStorage.getItem('cbu_api_reload')           || '15');
+    const tokIn    = parseInt(localStorage.getItem('cbu_api_tokens_input')        || '0');
+    const tokOut   = parseInt(localStorage.getItem('cbu_api_tokens_output')       || '0');
+    const costUsed = (tokIn / 1e6) * 0.80 + (tokOut / 1e6) * 4.00;
+    const pct      = starting > 0 ? Math.min(100, Math.max(0, (balance / starting) * 100)) : (balance > 0 ? 100 : 0);
+    el.innerHTML = `
+        <div class="api-balance-bar-wrap">
+            <div class="api-balance-bar-fill" style="width:${pct.toFixed(1)}%"></div>
+        </div>
+        <div class="api-balance-meta">
+            <span>$${balance.toFixed(4)} remaining</span>
+            <span>${pct.toFixed(0)}%</span>
+        </div>
+        <div class="api-stats-grid">
+            <div class="api-stat">
+                <div class="api-stat-label">Tokens Used</div>
+                <div class="api-stat-value">${(tokIn + tokOut).toLocaleString()}</div>
+            </div>
+            <div class="api-stat">
+                <div class="api-stat-label">Est. Cost</div>
+                <div class="api-stat-value">$${costUsed.toFixed(4)}</div>
+            </div>
+            <div class="api-stat">
+                <div class="api-stat-label">Warning At</div>
+                <div class="api-stat-value">$${warning.toFixed(2)}</div>
+            </div>
+            <div class="api-stat">
+                <div class="api-stat-label">Auto-Reload</div>
+                <div class="api-stat-value">$${reload.toFixed(2)}</div>
+            </div>
+        </div>`;
+}
+
+function msDelay(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function startClawdLoopIfNeeded() {
+    if (_clawdLoopStarted) return;
+    _clawdLoopStarted = true;
+    (async function loop() {
+        while (true) {
+            await msDelay(5000);
+            const el = document.getElementById('clawdMascot');
+            if (!el) { _clawdLoopStarted = false; return; }
+            el.classList.add('clawd-waving');
+            await msDelay(1200);
+            el.classList.remove('clawd-waving');
+            await msDelay(5000);
+            const el2 = document.getElementById('clawdMascot');
+            if (!el2) { _clawdLoopStarted = false; return; }
+            el2.classList.add('clawd-jumping');
+            await msDelay(650);
+            el2.classList.remove('clawd-jumping');
+        }
+    })();
 }
 
 // ── Modals ────────────────────────────────────
@@ -2570,6 +2714,20 @@ function bindEvents() {
         if (e.key === 'Enter') saveAnthropicKey();
     });
 
+    // Settings — API Credits
+    document.getElementById('saveApiCreditsBtn')?.addEventListener('click', saveApiCredits);
+    document.getElementById('apiBalanceInput')?.addEventListener('keydown', e => {
+        if (e.key === 'Enter') saveApiCredits();
+    });
+
+    // API Warning modal
+    document.getElementById('apiWarningContinue')?.addEventListener('click', () => resolveApiWarning(true));
+    document.getElementById('apiWarningCancel')?.addEventListener('click',   () => resolveApiWarning(false));
+    document.getElementById('closeApiWarningModal')?.addEventListener('click', () => resolveApiWarning(false));
+    document.getElementById('apiWarningModal')?.addEventListener('click', e => {
+        if (e.target === document.getElementById('apiWarningModal')) resolveApiWarning(false);
+    });
+
     // Claude assistant
     document.getElementById('claudeSimpleBtn')?.addEventListener('click', openSimpleMode);
     document.getElementById('claudeComplexBtn')?.addEventListener('click', openComplexMode);
@@ -2620,6 +2778,7 @@ function bindEvents() {
             ['canvasModal', 'scheduleModal', 'schedCustomEventModal', 'thesisLinkModal', 'calEventModal'].forEach(id => {
                 if (document.getElementById(id)?.classList.contains('open')) closeModal(id);
             });
+            if (document.getElementById('apiWarningModal')?.classList.contains('open')) resolveApiWarning(false);
         }
     });
 
