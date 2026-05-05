@@ -1764,7 +1764,8 @@ function gridDayClick(dateStr) {
 
 let filesPathStack = [{ path: '', label: 'Dropbox' }];
 
-function getDropboxToken() { return load('dropboxToken', ''); }
+function getDropboxToken()   { return load('dropboxToken', ''); }
+function getAnthropicKey()   { try { return localStorage.getItem('cbu_anthropicKey') || ''; } catch { return ''; } }
 
 // POST to api.dropboxapi.com (JSON → JSON)
 async function dropboxAPI(endpoint, body = {}) {
@@ -2162,6 +2163,7 @@ function bindFilesUpload() {
 // ── Settings ──────────────────────────────────
 
 function renderSettingsSection() {
+    // Dropbox
     const input = document.getElementById('dropboxTokenInput');
     const dot   = document.getElementById('dropboxDot');
     const token = getDropboxToken();
@@ -2171,6 +2173,21 @@ function renderSettingsSection() {
     }
     if (dot) dot.className = `settings-status-dot${token ? ' connected' : ''}`;
     setDropboxStatus(token ? 'saved' : '', token ? '✓ Token saved' : '');
+
+    // Anthropic
+    const aInput = document.getElementById('anthropicKeyInput');
+    const aDot   = document.getElementById('claudeDot');
+    const aKey   = getAnthropicKey();
+    if (aInput) {
+        aInput.value       = '';
+        aInput.placeholder = aKey ? 'Key saved — paste new key to replace' : 'sk-ant-…';
+    }
+    if (aDot) aDot.className = `settings-status-dot${aKey ? ' connected' : ''}`;
+    const aStatus = document.getElementById('anthropicKeyStatus');
+    if (aStatus) {
+        aStatus.className   = `settings-status${aKey ? ' settings-status-saved' : ''}`;
+        aStatus.textContent = aKey ? '✓ API key saved' : '';
+    }
 }
 
 function setDropboxStatus(cls, msg) {
@@ -2209,6 +2226,215 @@ async function testDropboxConnection() {
         setDropboxStatus('success', `✓ Connected as ${name}`);
     } catch (err) {
         setDropboxStatus('error', `⚠ ${err.message}`);
+    }
+}
+
+// ── Claude Assistant ──────────────────────────
+
+let claudeHistory = [];   // { role, content } pairs for Simple mode
+
+function saveAnthropicKey() {
+    const input = document.getElementById('anthropicKeyInput');
+    const raw   = input?.value.trim();
+    const sEl   = document.getElementById('anthropicKeyStatus');
+    const dot   = document.getElementById('claudeDot');
+    if (!raw) {
+        if (sEl) { sEl.className = 'settings-status settings-status-error'; sEl.textContent = '⚠ Paste a key above first.'; }
+        return;
+    }
+    try { localStorage.setItem('cbu_anthropicKey', raw); } catch (e) { console.warn(e); }
+    if (input) { input.value = ''; input.placeholder = 'Key saved — paste new key to replace'; }
+    if (sEl)   { sEl.className = 'settings-status settings-status-saved'; sEl.textContent = '✓ API key saved'; }
+    if (dot)   { dot.className = 'settings-status-dot connected'; }
+}
+
+function buildDashboardContext() {
+    const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    const lines = [`Today is ${today}.`, ''];
+
+    if (state.assignments.length) {
+        lines.push('UPCOMING ASSIGNMENTS:');
+        state.assignments.slice(0, 12).forEach(a => {
+            const due = a.dueAt
+                ? new Date(a.dueAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                : 'No due date';
+            lines.push(`• ${a.title} (${a.course}) — Due ${due}`);
+        });
+        lines.push('');
+    }
+
+    const delivLines = [];
+    PROJECT_NAMES.forEach((name, i) => {
+        const data = getProjectData(i + 1);
+        data.deliverables.filter(d => !d.completed).forEach(d => {
+            const due = d.dueDate
+                ? new Date(d.dueDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                : 'No date';
+            delivLines.push(`• [${name}] ${d.name} — Due ${due}`);
+        });
+    });
+    if (delivLines.length) {
+        lines.push('PROJECT DELIVERABLES (pending):');
+        lines.push(...delivLines);
+        lines.push('');
+    }
+
+    const pendingTodos = state.todos.filter(t => !t.completed);
+    if (pendingTodos.length) {
+        lines.push('TO-DO LIST:');
+        pendingTodos.slice(0, 8).forEach(t => lines.push(`• [${t.priority}] ${t.text}`));
+        lines.push('');
+    }
+
+    const todayStr  = new Date().toISOString().slice(0, 10);
+    const allEvents = [
+        ...CBU_FALL_2026,
+        ...state.calendarEvents,
+        ...state.customEvents.map(e => ({ ...e, label: e.name })),
+    ];
+    const upcoming = allEvents
+        .filter(e => e.date >= todayStr)
+        .sort((a, b) => a.date.localeCompare(b.date))
+        .slice(0, 8);
+    if (upcoming.length) {
+        lines.push('UPCOMING EVENTS:');
+        upcoming.forEach(e => {
+            const d = new Date(e.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            lines.push(`• ${d} — ${e.label} [${e.category}]`);
+        });
+    }
+
+    return lines.join('\n').trim();
+}
+
+function toggleClaudeMenu() {
+    const panel = document.getElementById('claudePanel');
+    if (panel?.classList.contains('open')) { closeClaudePanel(); return; }
+    document.getElementById('claudeMenu')?.classList.toggle('open');
+    document.getElementById('claudeFab')?.classList.toggle('active');
+}
+
+function closeClaudeMenu() {
+    document.getElementById('claudeMenu')?.classList.remove('open');
+    document.getElementById('claudeFab')?.classList.remove('active');
+}
+
+function openSimpleMode() {
+    closeClaudeMenu();
+    document.getElementById('claudePanel')?.classList.add('open');
+    renderChatHistory();
+    setTimeout(() => document.getElementById('claudeChatInput')?.focus(), 120);
+}
+
+function closeClaudePanel() {
+    document.getElementById('claudePanel')?.classList.remove('open');
+    document.getElementById('claudeFab')?.classList.remove('active');
+}
+
+async function openComplexMode() {
+    closeClaudeMenu();
+    const ctx = `Here is my current CBU Dashboard context:\n\n${buildDashboardContext()}`;
+    try {
+        await navigator.clipboard.writeText(ctx);
+        showClaudeToast('Context copied to clipboard — paste it into Claude to get started.');
+    } catch {
+        showClaudeToast('Could not copy automatically — allow clipboard access and try again.');
+    }
+    window.open('https://claude.ai', '_blank', 'noopener');
+}
+
+function showClaudeToast(msg) {
+    const el = document.getElementById('claudeToast');
+    if (!el) return;
+    el.textContent = msg;
+    el.classList.add('show');
+    clearTimeout(el._timer);
+    el._timer = setTimeout(() => el.classList.remove('show'), 4000);
+}
+
+function renderChatHistory() {
+    const el = document.getElementById('claudeChatHistory');
+    if (!el) return;
+    if (!claudeHistory.length) {
+        el.innerHTML = `<div class="claude-chat-empty">Ask about your assignments,<br>projects, deadlines, or to-dos.</div>`;
+        return;
+    }
+    el.innerHTML = claudeHistory.map(m => {
+        if (m.role === 'user')      return `<div class="claude-msg claude-msg-user">${esc(m.content)}</div>`;
+        if (m.role === 'assistant') return `<div class="claude-msg claude-msg-claude">${esc(m.content)}</div>`;
+        if (m.role === '_error')    return `<div class="claude-msg claude-msg-error">⚠ ${esc(m.content)}</div>`;
+        return '';
+    }).join('');
+    el.scrollTop = el.scrollHeight;
+}
+
+async function sendSimpleMessage() {
+    const input   = document.getElementById('claudeChatInput');
+    const sendBtn = document.getElementById('claudeSendBtn');
+    const histEl  = document.getElementById('claudeChatHistory');
+    const text    = input?.value.trim();
+    if (!text) return;
+
+    const apiKey = getAnthropicKey();
+    if (!apiKey) {
+        showClaudeToast('⚠ Add your Anthropic API key in Settings first.');
+        return;
+    }
+
+    input.value = '';
+    input.style.height = '';
+    sendBtn.disabled = true;
+
+    claudeHistory.push({ role: 'user', content: text });
+    renderChatHistory();
+
+    const typingEl = document.createElement('div');
+    typingEl.className = 'claude-typing';
+    typingEl.innerHTML = '<span></span><span></span><span></span>';
+    histEl?.appendChild(typingEl);
+    if (histEl) histEl.scrollTop = histEl.scrollHeight;
+
+    try {
+        const systemPrompt =
+            'You are a helpful assistant built into a student architecture dashboard for Aaron at CBU (Fall 2026). ' +
+            'Be concise and practical. Here is the current dashboard context:\n\n' +
+            buildDashboardContext();
+
+        const res = await fetch('https://api.anthropic.com/v1/messages', {
+            method:  'POST',
+            headers: {
+                'Content-Type':                    'application/json',
+                'x-api-key':                       apiKey,
+                'anthropic-version':               '2023-06-01',
+                'anthropic-dangerous-allow-browser': 'true',
+            },
+            body: JSON.stringify({
+                model:      'claude-haiku-4-5-20251001',
+                max_tokens: 1000,
+                system:     systemPrompt,
+                messages:   claudeHistory.filter(m => m.role === 'user' || m.role === 'assistant'),
+            }),
+        });
+
+        typingEl.remove();
+
+        if (!res.ok) {
+            let msg = `API error ${res.status}`;
+            try { const j = await res.json(); msg = j.error?.message || msg; } catch {}
+            throw new Error(msg);
+        }
+
+        const data  = await res.json();
+        const reply = data.content?.[0]?.text || '(empty response)';
+        claudeHistory.push({ role: 'assistant', content: reply });
+        renderChatHistory();
+    } catch (err) {
+        typingEl.remove();
+        claudeHistory.push({ role: '_error', content: err.message });
+        renderChatHistory();
+    } finally {
+        sendBtn.disabled = false;
+        input?.focus();
     }
 }
 
@@ -2346,6 +2572,30 @@ function bindEvents() {
         if (e.key === 'Enter') saveDropboxToken();
     });
 
+    // Settings — Anthropic
+    document.getElementById('saveAnthropicKeyBtn')?.addEventListener('click', saveAnthropicKey);
+    document.getElementById('anthropicKeyInput')?.addEventListener('keydown', e => {
+        if (e.key === 'Enter') saveAnthropicKey();
+    });
+
+    // Claude assistant
+    document.getElementById('claudeFab')?.addEventListener('click', toggleClaudeMenu);
+    document.getElementById('claudeSimpleBtn')?.addEventListener('click', openSimpleMode);
+    document.getElementById('claudeComplexBtn')?.addEventListener('click', openComplexMode);
+    document.getElementById('claudePanelClose')?.addEventListener('click', closeClaudePanel);
+    document.getElementById('claudeSendBtn')?.addEventListener('click', sendSimpleMessage);
+    document.getElementById('claudeChatInput')?.addEventListener('keydown', e => {
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendSimpleMessage(); }
+    });
+    document.getElementById('claudeChatInput')?.addEventListener('input', e => {
+        const ta = e.target;
+        ta.style.height = '';
+        ta.style.height = Math.min(ta.scrollHeight, 96) + 'px';
+    });
+    document.addEventListener('click', e => {
+        if (!e.target.closest('#claudeMenu') && !e.target.closest('#claudeFab')) closeClaudeMenu();
+    });
+
     // Settings — Canvas (opens existing modal)
     document.getElementById('settingsCanvasBtn')?.addEventListener('click', () => {
         document.getElementById('canvasUrl').value   = state.canvasSettings.url;
@@ -2382,6 +2632,8 @@ function bindEvents() {
             ['canvasModal', 'scheduleModal', 'schedCustomEventModal', 'thesisLinkModal', 'calEventModal'].forEach(id => {
                 if (document.getElementById(id)?.classList.contains('open')) closeModal(id);
             });
+            closeClaudeMenu();
+            closeClaudePanel();
         }
     });
 

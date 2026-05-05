@@ -347,6 +347,33 @@
                     <p class="settings-description">Sync assignments from your Canvas courses on the Assignments tab.</p>
                     <button class="btn btn-ghost" id="settingsCanvasBtn">Open Canvas Settings →</button>
                 </div>
+
+                <!-- Claude Assistant card -->
+                <div class="settings-card">
+                    <div class="settings-card-header">
+                        <h3>Claude Assistant</h3>
+                        <span class="settings-status-dot" id="claudeDot"></span>
+                    </div>
+                    <p class="settings-description">Add your Anthropic API key to enable Simple Mode — quick questions answered by Claude Haiku directly in the dashboard.</p>
+                    <div class="form-group" style="max-width:480px">
+                        <label for="anthropicKeyInput">Anthropic API Key</label>
+                        <input type="password" id="anthropicKeyInput" class="input-field" placeholder="sk-ant-…">
+                    </div>
+                    <div class="settings-actions">
+                        <button class="btn btn-primary" id="saveAnthropicKeyBtn">Save Key</button>
+                    </div>
+                    <div class="settings-status" id="anthropicKeyStatus"></div>
+                    <details class="settings-help">
+                        <summary>How to get your API key</summary>
+                        <ol>
+                            <li>Go to <a href="https://console.anthropic.com" target="_blank" rel="noopener">console.anthropic.com</a></li>
+                            <li>Sign in or create an account</li>
+                            <li>Navigate to <strong>API Keys</strong> and click <strong>Create Key</strong></li>
+                            <li>Copy the key and paste it above</li>
+                        </ol>
+                        <p class="form-hint" style="margin-top:8px">Your key is stored only in this browser's <code>localStorage</code> and is sent only to Anthropic's servers.</p>
+                    </details>
+                </div>
             </section>
 
         </div>
@@ -495,6 +522,48 @@
             </div>
         </div>
     </div>
+
+    <!-- Claude Assistant FAB -->
+    <button class="claude-fab" id="claudeFab" aria-label="Claude assistant">
+        <svg viewBox="0 0 24 24" fill="currentColor" width="21" height="21" aria-hidden="true">
+            <path d="M20 2H4C2.9 2 2 2.9 2 4v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/>
+        </svg>
+    </button>
+
+    <!-- Claude Popup Menu -->
+    <div class="claude-menu" id="claudeMenu" role="menu">
+        <button class="claude-menu-btn" id="claudeSimpleBtn" role="menuitem">
+            <span class="claude-menu-icon">⚡</span>
+            <div>
+                <div class="claude-menu-label">Simple</div>
+                <div class="claude-menu-sub">Quick questions · Haiku</div>
+            </div>
+        </button>
+        <button class="claude-menu-btn" id="claudeComplexBtn" role="menuitem">
+            <span class="claude-menu-icon">✦</span>
+            <div>
+                <div class="claude-menu-label">Complex</div>
+                <div class="claude-menu-sub">Open Claude.ai with context</div>
+            </div>
+        </button>
+    </div>
+
+    <!-- Claude Simple Chat Panel -->
+    <div class="claude-panel" id="claudePanel" aria-label="Claude chat">
+        <div class="claude-panel-header">
+            <span class="claude-panel-title">Claude — Simple Mode</span>
+            <button class="claude-panel-close" id="claudePanelClose" aria-label="Close chat">✕</button>
+        </div>
+        <div class="claude-chat-history" id="claudeChatHistory"></div>
+        <div class="claude-chat-input-row">
+            <textarea class="claude-chat-input" id="claudeChatInput"
+                placeholder="Ask about assignments, projects, deadlines…" rows="1"></textarea>
+            <button class="claude-send-btn" id="claudeSendBtn" aria-label="Send">↑</button>
+        </div>
+    </div>
+
+    <!-- Toast notification -->
+    <div class="claude-toast" id="claudeToast" role="status" aria-live="polite"></div>
 
     <script src="js/app.js"></script>
 </body>
