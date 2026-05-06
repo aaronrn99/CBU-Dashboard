@@ -2380,12 +2380,6 @@ async function sendSimpleMessage() {
     const text    = input?.value.trim();
     if (!text) return;
 
-    const apiKey = getAnthropicKey();
-    if (!apiKey) {
-        showClaudeToast('⚠ Add your Anthropic API key in Settings first.');
-        return;
-    }
-
     // Balance warning check
     const _curBal  = parseFloat(localStorage.getItem('cbu_api_balance')  || '0');
     const _warnThr = parseFloat(localStorage.getItem('cbu_api_warning') || '2');
@@ -2413,14 +2407,9 @@ async function sendSimpleMessage() {
             'Be concise and practical. Here is the current dashboard context:\n\n' +
             buildDashboardContext();
 
-        const res = await fetch('https://api.anthropic.com/v1/messages', {
+        const res = await fetch('/api/claude', {
             method:  'POST',
-            headers: {
-                'Content-Type':                    'application/json',
-                'x-api-key':                       apiKey,
-                'anthropic-version':               '2023-06-01',
-                'anthropic-dangerous-allow-browser': 'true',
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 model:      'claude-haiku-4-5-20251001',
                 max_tokens: 1000,
