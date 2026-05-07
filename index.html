@@ -124,19 +124,22 @@
 
             <!-- To-Do List -->
             <section id="todos" class="section">
-                <div class="section-header">
-                    <h2>To-Do List</h2>
+                <div class="todo-day-nav">
+                    <button class="todo-nav-btn" id="todoPrevDayBtn" aria-label="Previous day">←</button>
+                    <div class="todo-day-center">
+                        <div class="todo-day-name-row">
+                            <span class="todo-day-name" id="todoDayName"></span>
+                            <span class="todo-today-badge" id="todoTodayBadge">Today</span>
+                        </div>
+                        <span class="todo-day-date" id="todoDayDate"></span>
+                    </div>
+                    <button class="todo-nav-btn" id="todoNextDayBtn" aria-label="Next day">→</button>
                 </div>
-                <div class="todo-input-row">
-                    <input type="text" id="todoInput" class="input-field" placeholder="Add a new task…">
-                    <select id="todoPriority" class="select-field">
-                        <option value="low">Low</option>
-                        <option value="medium" selected>Medium</option>
-                        <option value="high">High</option>
-                    </select>
-                    <button class="btn btn-primary" id="addTodoBtn">Add</button>
+                <div class="todo-list-wrap" id="todoListWrap"></div>
+                <div class="todo-add-row">
+                    <input type="text" id="todoInput" class="todo-add-input" placeholder="Add a task…">
+                    <button class="todo-add-btn" id="addTodoBtn" aria-label="Add task">+</button>
                 </div>
-                <ul class="todo-list" id="todoList"></ul>
             </section>
 
             <!-- Studio Projects -->

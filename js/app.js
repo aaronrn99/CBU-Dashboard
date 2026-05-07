@@ -5,7 +5,6 @@
 
 // ── State ─────────────────────────────────────
 const state = {
-    todos: [],
     notes: [],
     schedule: {},
     canvasSettings: { url: '', token: '' },
@@ -46,7 +45,6 @@ function esc(str) {
 
 // ── Init ──────────────────────────────────────
 function init() {
-    state.todos          = load('todos', []);
     state.notes          = load('notes', []);
     state.schedule       = load('schedule', {});
     state.canvasSettings = load('canvasSettings', { url: '', token: '' });
@@ -58,6 +56,8 @@ function init() {
         links: load('thesis_links', []),
         pdfs:  load('thesis_pdfs',  []),
     };
+
+    _todosViewDate = todayDateStr();
 
     setDateDisplay();
     initBanner();
@@ -392,66 +392,114 @@ function renderAssignments() {
 }
 
 // ── To-Do ────────────────────────────────────
+// ── Day-by-Day To-Do ──────────────────────────
+
+let _todosViewDate = null; // YYYY-MM-DD
+
+function todayDateStr() {
+    return new Date().toISOString().slice(0, 10);
+}
+
+function getTodosForDay(dateStr) {
+    try {
+        const raw = localStorage.getItem('cbu_todos_' + dateStr);
+        return raw ? JSON.parse(raw) : [];
+    } catch { return []; }
+}
+
+function saveTodosForDay(dateStr, todos) {
+    localStorage.setItem('cbu_todos_' + dateStr, JSON.stringify(todos));
+}
+
+function todosGoDay(delta) {
+    const d = new Date(_todosViewDate + 'T12:00:00');
+    d.setDate(d.getDate() + delta);
+    _todosViewDate = d.toISOString().slice(0, 10);
+    renderTodos();
+}
+
 function addTodo() {
     const input = document.getElementById('todoInput');
-    const text  = input.value.trim();
+    const text  = input?.value.trim();
     if (!text) return;
-
-    state.todos.unshift({
-        id:        Date.now(),
-        text,
-        priority:  document.getElementById('todoPriority').value,
-        completed: false,
-        createdAt: new Date().toISOString(),
-    });
-    save('todos', state.todos);
+    const todos = getTodosForDay(_todosViewDate);
+    todos.unshift({ id: Date.now(), text, completed: false });
+    saveTodosForDay(_todosViewDate, todos);
     input.value = '';
     renderTodos();
 }
 
 function toggleTodo(id) {
-    const todo = state.todos.find(t => t.id === id);
+    const todos = getTodosForDay(_todosViewDate);
+    const todo  = todos.find(t => t.id === id);
     if (!todo) return;
     todo.completed = !todo.completed;
-    save('todos', state.todos);
+    saveTodosForDay(_todosViewDate, todos);
+    if (todo.completed) {
+        const itemEl = document.querySelector(`.dtask[data-id="${id}"]`);
+        if (itemEl) {
+            itemEl.classList.add('completed', 'dtask--sinking');
+            const circle = itemEl.querySelector('.dtask-circle');
+            if (circle) {
+                circle.classList.add('checked');
+                circle.innerHTML = '<svg viewBox="0 0 12 12" width="12" height="12"><polyline points="2,6 5,9 10,3" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+            }
+            const txt = itemEl.querySelector('.dtask-text');
+            if (txt) txt.style.textDecoration = 'line-through';
+            setTimeout(() => renderTodos(), 260);
+            return;
+        }
+    }
     renderTodos();
 }
 
 function deleteTodo(id) {
-    state.todos = state.todos.filter(t => t.id !== id);
-    save('todos', state.todos);
+    saveTodosForDay(_todosViewDate, getTodosForDay(_todosViewDate).filter(t => t.id !== id));
     renderTodos();
 }
 
 function renderTodos() {
-    const el = document.getElementById('todoList');
-    if (!el) return;
+    if (!_todosViewDate) _todosViewDate = todayDateStr();
+    const today   = todayDateStr();
+    const isToday = _todosViewDate === today;
 
-    if (!state.todos.length) {
-        el.innerHTML = `<div class="empty-state">
-            <div class="empty-state-icon">✓</div>
-            <div class="empty-state-text">No tasks yet. Add one above!</div>
-        </div>`;
+    const d       = new Date(_todosViewDate + 'T12:00:00');
+    const dayName = d.toLocaleDateString('en-US', { weekday: 'long' });
+    const dateStr = d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+
+    const nameEl  = document.getElementById('todoDayName');
+    const dateEl  = document.getElementById('todoDayDate');
+    const badge   = document.getElementById('todoTodayBadge');
+    if (nameEl) nameEl.textContent  = dayName;
+    if (dateEl) dateEl.textContent  = dateStr;
+    if (badge)  badge.style.display = isToday ? '' : 'none';
+
+    const wrap  = document.getElementById('todoListWrap');
+    if (!wrap) return;
+    const todos = getTodosForDay(_todosViewDate);
+
+    if (!todos.length) {
+        wrap.innerHTML = '<p class="todo-empty">No tasks for this day.</p>';
         return;
     }
 
-    const order = { high: 0, medium: 1, low: 2 };
-    const sorted = [...state.todos].sort((a, b) => {
+    const sorted = [...todos].sort((a, b) => {
         if (a.completed !== b.completed) return a.completed ? 1 : -1;
-        return (order[a.priority] ?? 1) - (order[b.priority] ?? 1);
+        return b.id - a.id;
     });
 
-    el.innerHTML = sorted.map(t => `
-        <li class="todo-item${t.completed ? ' completed' : ''}">
-            <div class="todo-checkbox${t.completed ? ' checked' : ''}"
-                 onclick="toggleTodo(${t.id})" role="checkbox"
-                 aria-checked="${t.completed}" tabindex="0"
-                 onkeydown="if(event.key==='Enter'||event.key===' ')toggleTodo(${t.id})">
-            </div>
-            <div class="priority-dot priority-${esc(t.priority)}"></div>
-            <span class="todo-text">${esc(t.text)}</span>
-            <button class="btn btn-danger" onclick="deleteTodo(${t.id})" aria-label="Delete task">✕</button>
-        </li>`
+    const checkmark = '<svg viewBox="0 0 12 12" width="12" height="12"><polyline points="2,6 5,9 10,3" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+    wrap.innerHTML = sorted.map(t => `
+        <div class="dtask${t.completed ? ' completed' : ''}" data-id="${t.id}">
+            <button class="dtask-circle${t.completed ? ' checked' : ''}"
+                    onclick="toggleTodo(${t.id})"
+                    aria-label="${t.completed ? 'Mark incomplete' : 'Mark complete'}">
+                ${t.completed ? checkmark : ''}
+            </button>
+            <span class="dtask-text">${esc(t.text)}</span>
+            <button class="dtask-del" onclick="deleteTodo(${t.id})" aria-label="Delete task">✕</button>
+        </div>`
     ).join('');
 }
 
@@ -2297,10 +2345,10 @@ function buildDashboardContext() {
         lines.push('');
     }
 
-    const pendingTodos = state.todos.filter(t => !t.completed);
-    if (pendingTodos.length) {
-        lines.push('TO-DO LIST:');
-        pendingTodos.slice(0, 8).forEach(t => lines.push(`• [${t.priority}] ${t.text}`));
+    const todayPending = getTodosForDay(new Date().toISOString().slice(0, 10)).filter(t => !t.completed);
+    if (todayPending.length) {
+        lines.push("TODAY'S TO-DO LIST:");
+        todayPending.slice(0, 8).forEach(t => lines.push(`• ${t.text}`));
         lines.push('');
     }
 
@@ -2610,7 +2658,9 @@ function bindEvents() {
     // Canvas sync
     document.getElementById('syncCanvas')?.addEventListener('click', syncCanvas);
 
-    // Todos
+    // Todos — day navigation
+    document.getElementById('todoPrevDayBtn')?.addEventListener('click', () => todosGoDay(-1));
+    document.getElementById('todoNextDayBtn')?.addEventListener('click', () => todosGoDay(1));
     document.getElementById('addTodoBtn')?.addEventListener('click', addTodo);
     document.getElementById('todoInput')?.addEventListener('keydown', e => {
         if (e.key === 'Enter') addTodo();
