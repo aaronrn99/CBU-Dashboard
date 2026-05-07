@@ -106,6 +106,7 @@ body {
 .banner-text {
     position: relative;
     z-index: 1;
+    font-size: 15.6px;
     transition: opacity 0.6s ease;
 }
 
