@@ -249,7 +249,7 @@ async function syncCanvas() {
 
     if (!url || !token) {
         statusEl.className = 'canvas-status error';
-        statusEl.textContent = '⚠ Canvas not configured — click "Canvas Settings" in the sidebar.';
+        statusEl.textContent = 'Canvas not configured — click "Canvas Settings" in the sidebar.';
         return;
     }
 
@@ -324,12 +324,12 @@ async function syncCanvas() {
 
         statusEl.className = 'canvas-status success';
         statusEl.textContent =
-            `✓ Synced ${allAssignments.length} assignment(s) from ${courses.length} course(s) · ` +
+            `Synced ${allAssignments.length} assignment(s) from ${courses.length} course(s) · ` +
             new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 
     } catch (err) {
         statusEl.className = 'canvas-status error';
-        statusEl.textContent = `⚠ ${err.message}`;
+        statusEl.textContent = err.message;
     } finally {
         syncBtn.disabled = false;
         syncBtn.textContent = '↻ Sync Canvas';
@@ -362,7 +362,7 @@ function renderAssignments() {
             ? 'Configure Canvas to sync your assignments.'
             : 'No upcoming assignments found. Click "Sync Canvas" to fetch.';
         el.innerHTML = `<div class="empty-state">
-            <div class="empty-state-icon">📋</div>
+            <div class="empty-state-icon"></div>
             <div class="empty-state-text">${msg}</div>
         </div>`;
         return;
@@ -377,7 +377,7 @@ function renderAssignments() {
                 <div class="assignment-title">${esc(a.title)}</div>
                 <div class="assignment-meta">
                     <span>${esc(a.course)}</span>
-                    <span>📅 ${fmtDue(a.dueAt)}</span>
+                    <span>${fmtDue(a.dueAt)}</span>
                     ${pts ? `<span>${pts}</span>` : ''}
                 </div>
             </div>
@@ -589,7 +589,7 @@ function renderStudioNotes() {
     const data = getProjectData(currentProjectId);
     if (!data.notes.length) {
         el.innerHTML = `<div class="empty-state" style="padding:28px 20px">
-            <div class="empty-state-icon">📝</div>
+            <div class="empty-state-icon"></div>
             <div class="empty-state-text">No critique notes yet. Add one above.</div>
         </div>`;
         return;
@@ -620,7 +620,7 @@ function renderStudioFiles() {
         contentEl.innerHTML = `
         <div class="files-upload-area" style="margin-bottom:12px">
             <div class="files-drop-zone" id="studioDropZone">
-                <span class="files-drop-icon">☁</span>
+                <span class="files-drop-icon"></span>
                 <span>Drop files here to upload to Dropbox</span>
             </div>
             <label class="btn btn-ghost" for="studioUploadInput" style="cursor:pointer">↑ Upload File</label>
@@ -637,14 +637,14 @@ function renderStudioFilesList() {
     const data = getProjectData(currentProjectId);
     if (!data.files.length) {
         el.innerHTML = `<div class="empty-state" style="padding:24px 20px">
-            <div class="empty-state-icon">📁</div>
+            <div class="empty-state-icon"></div>
             <div class="empty-state-text">No files uploaded yet.</div>
         </div>`;
         return;
     }
     el.innerHTML = data.files.map(f => {
         const ext  = (f.name.split('.').pop() || '').toLowerCase();
-        const icon = FILE_ICONS[ext] || '📄';
+        const icon = FILE_ICONS[ext] || '';
         return `
         <div class="pdf-item">
             <span class="pdf-icon">${icon}</span>
@@ -728,7 +728,7 @@ async function handleStudioUpload(files) {
                 if (statusEl) statusEl.textContent = `${pct}%`;
             });
             if (barEl)    barEl.style.width = '100%';
-            if (statusEl) { statusEl.textContent = '✓ Done'; statusEl.className = 'files-upload-status done'; }
+            if (statusEl) { statusEl.textContent = 'Done'; statusEl.className = 'files-upload-status done'; }
             const data = getProjectData(currentProjectId);
             data.files.unshift({
                 id:         item.id,
@@ -741,7 +741,7 @@ async function handleStudioUpload(files) {
             renderStudioFilesList();
         } catch {
             if (barEl)    { barEl.style.background = 'var(--red)'; barEl.style.width = '100%'; }
-            if (statusEl) { statusEl.textContent = '⚠ Failed'; statusEl.className = 'files-upload-status error'; }
+            if (statusEl) { statusEl.textContent = 'Failed'; statusEl.className = 'files-upload-status error'; }
         }
     }));
 
@@ -833,7 +833,7 @@ function renderStudioDeliverables() {
     const data = getProjectData(currentProjectId);
     if (!data.deliverables.length) {
         el.innerHTML = `<div class="empty-state" style="padding:28px 20px">
-            <div class="empty-state-icon">📅</div>
+            <div class="empty-state-icon"></div>
             <div class="empty-state-text">No deliverables yet. Add one above.</div>
         </div>`;
         return;
@@ -1278,7 +1278,7 @@ function renderNotes() {
 
     if (!state.notes.length) {
         el.innerHTML = `<div class="empty-state" style="grid-column:1/-1">
-            <div class="empty-state-icon">📝</div>
+            <div class="empty-state-icon"></div>
             <div class="empty-state-text">No notes yet. Click "+ New Note" to create one.</div>
         </div>`;
         return;
@@ -1395,7 +1395,7 @@ function renderThesisNotes() {
     if (!el) return;
     if (!state.thesis.notes.length) {
         el.innerHTML = `<div class="empty-state" style="grid-column:1/-1">
-            <div class="empty-state-icon">📝</div>
+            <div class="empty-state-icon"></div>
             <div class="empty-state-text">No thesis notes yet. Click "+ New Note" to create one.</div>
         </div>`;
         return;
@@ -1441,14 +1441,14 @@ function renderThesisLinks() {
     if (!el) return;
     if (!state.thesis.links.length) {
         el.innerHTML = `<div class="empty-state">
-            <div class="empty-state-icon">🔗</div>
+            <div class="empty-state-icon"></div>
             <div class="empty-state-text">No links yet. Click "+ Add Link" to save a research URL.</div>
         </div>`;
         return;
     }
     el.innerHTML = state.thesis.links.map(l => `
         <div class="link-item">
-            <span class="link-icon">🔗</span>
+            <span class="link-icon"></span>
             <div class="link-info">
                 <div class="link-label">${esc(l.label)}</div>
                 <div class="link-url">${esc(l.url)}</div>
@@ -1530,14 +1530,14 @@ function renderThesisPdfs() {
     if (!el) return;
     if (!state.thesis.pdfs.length) {
         el.innerHTML = `<div class="empty-state">
-            <div class="empty-state-icon">📄</div>
+            <div class="empty-state-icon"></div>
             <div class="empty-state-text">No PDFs yet. Click "+ Upload PDF" to add one.</div>
         </div>`;
         return;
     }
     el.innerHTML = state.thesis.pdfs.map(p => `
         <div class="pdf-item">
-            <span class="pdf-icon">📄</span>
+            <span class="pdf-icon"></span>
             <div class="pdf-info">
                 <div class="pdf-name">${esc(p.name)}</div>
                 <div class="pdf-meta">${fmtFileSize(p.size)} · Added ${fmtNoteDate(p.addedAt)}</div>
@@ -1655,7 +1655,7 @@ function renderCalendar() {
 
     if (!groups.length) {
         el.innerHTML = `<div class="empty-state">
-            <div class="empty-state-icon">🗓</div>
+            <div class="empty-state-icon"></div>
             <div class="empty-state-text">No events on the calendar.</div>
         </div>`;
         renderCalGrid();
@@ -1857,22 +1857,22 @@ async function dropboxTempLink(path) {
 }
 
 const FILE_ICONS = {
-    jpg:'🖼', jpeg:'🖼', png:'🖼', gif:'🖼', webp:'🖼', svg:'🖼', heic:'🖼',
-    pdf:'📄',
-    doc:'📝', docx:'📝', txt:'📝', rtf:'📝', md:'📝',
-    xls:'📊', xlsx:'📊', csv:'📊', numbers:'📊',
-    ppt:'📊', pptx:'📊', key:'📊',
-    ai:'🎨', psd:'🎨', indd:'🎨', sketch:'🎨', fig:'🎨', xd:'🎨',
-    dwg:'📐', dxf:'📐', rvt:'📐',
-    mp4:'🎬', mov:'🎬', avi:'🎬', mkv:'🎬',
-    mp3:'🎵', wav:'🎵', aac:'🎵',
-    zip:'📦', rar:'📦', '7z':'📦',
+    jpg:'', jpeg:'', png:'', gif:'', webp:'', svg:'', heic:'',
+    pdf:'',
+    doc:'', docx:'', txt:'', rtf:'', md:'',
+    xls:'', xlsx:'', csv:'', numbers:'',
+    ppt:'', pptx:'', key:'',
+    ai:'', psd:'', indd:'', sketch:'', fig:'', xd:'',
+    dwg:'', dxf:'', rvt:'',
+    mp4:'', mov:'', avi:'', mkv:'',
+    mp3:'', wav:'', aac:'',
+    zip:'', rar:'', '7z':'',
 };
 
 function fileTypeIcon(entry) {
-    if (entry['.tag'] === 'folder') return '📁';
+    if (entry['.tag'] === 'folder') return '';
     const ext = (entry.name.split('.').pop() || '').toLowerCase();
-    return FILE_ICONS[ext] || '📄';
+    return FILE_ICONS[ext] || '';
 }
 
 function isThumbable(name) { return /\.(jpg|jpeg|png|webp|gif)$/i.test(name); }
@@ -1909,7 +1909,7 @@ async function loadFilesFolder(path) {
         renderFilesGrid(result.entries || []);
     } catch (err) {
         grid.innerHTML = `<div class="empty-state">
-            <div class="empty-state-icon">⚠</div>
+            <div class="empty-state-icon">!</div>
             <div class="empty-state-text">${esc(err.message)}</div>
         </div>`;
     }
@@ -1923,7 +1923,7 @@ function renderFilesGrid(entries) {
     if (!grid) return;
     if (!entries.length) {
         grid.innerHTML = `<div class="empty-state">
-            <div class="empty-state-icon">📁</div>
+            <div class="empty-state-icon"></div>
             <div class="empty-state-text">This folder is empty.</div>
         </div>`;
         return;
@@ -2001,7 +2001,7 @@ async function loadThumbnailCard(path, idx) {
         if (url && preview.isConnected) {
             preview.innerHTML =
                 `<img src="${url}" alt="" class="files-card-thumb"
-                    onerror="this.parentNode.textContent='🖼'">`;
+                    onerror="this.parentNode.textContent=''">`;
         }
     } catch { /* keep icon */ }
 }
@@ -2012,7 +2012,7 @@ function updateFilesBreadcrumb() {
     if (!el) return;
     el.innerHTML = filesPathStack.map((bc, i) => {
         const isLast = i === filesPathStack.length - 1;
-        const label  = i === 0 ? `☁ ${bc.label}` : esc(bc.label);
+        const label  = esc(bc.label);
         if (isLast) return `<span class="files-bc-item files-bc-current">${label}</span>`;
         return `<span class="files-bc-item files-bc-link" data-bc-idx="${i}">${label}</span>`
              + `<span class="files-bc-sep">›</span>`;
@@ -2036,7 +2036,7 @@ async function openDropboxFile(path, name) {
         if (!grid) return;
         const t = document.createElement('div');
         t.className = 'files-error-toast';
-        t.textContent = `⚠ Could not open "${name}": ${msg}`;
+        t.textContent = `Could not open "${name}": ${msg}`;
         grid.prepend(t);
         setTimeout(() => t.remove(), 5000);
     };
@@ -2055,7 +2055,7 @@ async function downloadDropboxFile(path, name, btn) {
         if (!grid) return;
         const t = document.createElement('div');
         t.className = 'files-error-toast';
-        t.textContent = `⚠ Could not download "${name}": ${msg}`;
+        t.textContent = `Could not download "${name}": ${msg}`;
         grid.prepend(t);
         setTimeout(() => t.remove(), 6000);
     };
@@ -2168,16 +2168,16 @@ async function handleDropboxUpload(files) {
                 if (statusEl) statusEl.textContent = `${pct}%`;
             });
             if (barEl)    barEl.style.width   = '100%';
-            if (statusEl) { statusEl.textContent = '✓ Done'; statusEl.className = 'files-upload-status done'; }
+            if (statusEl) { statusEl.textContent = 'Done'; statusEl.className = 'files-upload-status done'; }
         } catch (err) {
             anyFailed = true;
             if (barEl)    { barEl.style.background = 'var(--red)'; barEl.style.width = '100%'; }
-            if (statusEl) { statusEl.textContent = '⚠ Failed'; statusEl.className = 'files-upload-status error'; }
+            if (statusEl) { statusEl.textContent = 'Failed'; statusEl.className = 'files-upload-status error'; }
             const grid = document.getElementById('filesGrid');
             if (grid) {
                 const t = document.createElement('div');
                 t.className   = 'files-error-toast';
-                t.textContent = `⚠ Failed to upload "${item.file.name}": ${err.message}`;
+                t.textContent = `Failed to upload "${item.file.name}": ${err.message}`;
                 grid.prepend(t);
                 setTimeout(() => t.remove(), 6000);
             }
@@ -2225,7 +2225,7 @@ function renderSettingsSection() {
         input.placeholder = token ? 'Token saved — paste new token to replace' : 'Paste your Dropbox access token';
     }
     if (dot) dot.className = `settings-status-dot${token ? ' connected' : ''}`;
-    setDropboxStatus(token ? 'saved' : '', token ? '✓ Token saved' : '');
+    setDropboxStatus(token ? 'saved' : '', token ? 'Token saved' : '');
 
     // Anthropic
     const aInput = document.getElementById('anthropicKeyInput');
@@ -2239,7 +2239,7 @@ function renderSettingsSection() {
     const aStatus = document.getElementById('anthropicKeyStatus');
     if (aStatus) {
         aStatus.className   = `settings-status${aKey ? ' settings-status-saved' : ''}`;
-        aStatus.textContent = aKey ? '✓ API key saved' : '';
+        aStatus.textContent = aKey ? 'API key saved' : '';
     }
 
     // API Credits
@@ -2266,10 +2266,10 @@ function setDropboxStatus(cls, msg) {
 async function saveDropboxToken() {
     const input = document.getElementById('dropboxTokenInput');
     const raw   = input?.value?.trim();
-    if (!raw) { setDropboxStatus('error', '⚠ Paste a token above first.'); return; }
+    if (!raw) { setDropboxStatus('error', 'Paste a token above first.'); return; }
     save('dropboxToken', raw);
     if (input) { input.value = ''; input.placeholder = 'Token saved — paste new token to replace'; }
-    setDropboxStatus('saved', '✓ Token saved. Testing connection…');
+    setDropboxStatus('saved', 'Token saved. Testing connection…');
     await testDropboxConnection();
 }
 
@@ -2289,9 +2289,9 @@ async function testDropboxConnection() {
         }
         const user = await res.json();
         const name = user.name?.display_name || user.email || 'your account';
-        setDropboxStatus('success', `✓ Connected as ${name}`);
+        setDropboxStatus('success', `Connected as ${name}`);
     } catch (err) {
-        setDropboxStatus('error', `⚠ ${err.message}`);
+        setDropboxStatus('error', err.message);
     }
 }
 
@@ -2305,12 +2305,12 @@ function saveAnthropicKey() {
     const sEl   = document.getElementById('anthropicKeyStatus');
     const dot   = document.getElementById('claudeDot');
     if (!raw) {
-        if (sEl) { sEl.className = 'settings-status settings-status-error'; sEl.textContent = '⚠ Paste a key above first.'; }
+        if (sEl) { sEl.className = 'settings-status settings-status-error'; sEl.textContent = 'Paste a key above first.'; }
         return;
     }
     try { localStorage.setItem('cbu_anthropicKey', raw); } catch (e) { console.warn(e); }
     if (input) { input.value = ''; input.placeholder = 'Key saved — paste new key to replace'; }
-    if (sEl)   { sEl.className = 'settings-status settings-status-saved'; sEl.textContent = '✓ API key saved'; }
+    if (sEl)   { sEl.className = 'settings-status settings-status-saved'; sEl.textContent = 'API key saved'; }
     if (dot)   { dot.className = 'settings-status-dot connected'; }
 }
 
@@ -2415,7 +2415,7 @@ function renderChatHistory() {
     el.innerHTML = claudeHistory.map(m => {
         if (m.role === 'user')      return `<div class="claude-msg claude-msg-user">${esc(m.content)}</div>`;
         if (m.role === 'assistant') return `<div class="claude-msg claude-msg-claude">${esc(m.content)}</div>`;
-        if (m.role === '_error')    return `<div class="claude-msg claude-msg-error">⚠ ${esc(m.content)}</div>`;
+        if (m.role === '_error')    return `<div class="claude-msg claude-msg-error">${esc(m.content)}</div>`;
         return '';
     }).join('');
     el.scrollTop = el.scrollHeight;
@@ -2545,7 +2545,7 @@ function saveApiCredits() {
     localStorage.setItem('cbu_api_tokens_input',  '0');
     localStorage.setItem('cbu_api_tokens_output', '0');
     const status = document.getElementById('apiCreditsStatus');
-    if (status) { status.className = 'settings-status settings-status-saved'; status.textContent = '✓ Saved'; }
+    if (status) { status.className = 'settings-status settings-status-saved'; status.textContent = 'Saved'; }
     renderApiCreditSection();
 }
 

@@ -25,7 +25,7 @@
     <nav class="sidebar" id="sidebar">
         <div class="sidebar-header">
             <div class="logo">
-                <span class="logo-icon">◈</span>
+                <span class="logo-icon"></span>
                 <div>
                     <div class="logo-title">CBU Dashboard</div>
                     <div class="logo-subtitle">Architecture · Fall 2026</div>
@@ -35,47 +35,47 @@
         <ul class="nav-links">
             <li>
                 <a href="#assignments" class="nav-link active" data-section="assignments">
-                    <span class="nav-icon">📋</span> Assignments
+                    <span class="nav-icon"></span> Assignments
                 </a>
             </li>
             <li>
                 <a href="#todos" class="nav-link" data-section="todos">
-                    <span class="nav-icon">✓</span> To-Do List
+                    <span class="nav-icon"></span> To-Do List
                 </a>
             </li>
             <li>
                 <a href="#studio" class="nav-link" data-section="studio">
-                    <span class="nav-icon">🏗</span> Studio Projects
+                    <span class="nav-icon"></span> Studio Projects
                 </a>
             </li>
             <li>
                 <a href="#schedule" class="nav-link" data-section="schedule">
-                    <span class="nav-icon">📅</span> Weekly Schedule
+                    <span class="nav-icon"></span> Weekly Schedule
                 </a>
             </li>
             <li>
                 <a href="#calendar" class="nav-link" data-section="calendar">
-                    <span class="nav-icon">🗓</span> Calendar
+                    <span class="nav-icon"></span> Calendar
                 </a>
             </li>
             <li>
                 <a href="#notes" class="nav-link" data-section="notes">
-                    <span class="nav-icon">📝</span> Notes
+                    <span class="nav-icon"></span> Notes
                 </a>
             </li>
             <li>
                 <a href="#thesis" class="nav-link" data-section="thesis">
-                    <span class="nav-icon">🎓</span> Thesis
+                    <span class="nav-icon"></span> Thesis
                 </a>
             </li>
             <li>
                 <a href="#files" class="nav-link" data-section="files">
-                    <span class="nav-icon">☁</span> Files
+                    <span class="nav-icon"></span> Files
                 </a>
             </li>
             <li>
                 <a href="#settings" class="nav-link" data-section="settings">
-                    <span class="nav-icon">⚙</span> Settings
+                    <span class="nav-icon"></span> Settings
                 </a>
             </li>
             <li>
@@ -91,7 +91,7 @@
             </li>
         </ul>
         <div class="sidebar-footer">
-            <button class="btn btn-ghost full-width" id="canvasSettingsBtn">⚙ Canvas Settings</button>
+            <button class="btn btn-ghost full-width" id="canvasSettingsBtn">Canvas Settings</button>
         </div>
     </nav>
 
@@ -284,18 +284,18 @@
                 <!-- No token: empty state + suggested folder structure -->
                 <div id="filesNoToken">
                     <div class="empty-state">
-                        <div class="empty-state-icon">☁</div>
+                        <div class="empty-state-icon"></div>
                         <div class="empty-state-text">Connect your Dropbox to browse files from the dashboard.</div>
                         <button class="btn btn-primary" style="margin-top:14px" onclick="showSection('settings')">Connect Dropbox</button>
                     </div>
                     <div class="files-suggested">
                         <div class="files-suggested-title">Suggested folder structure for CBU Architecture</div>
                         <div class="files-suggested-grid">
-                            <div class="files-suggested-folder"><span>📁</span><span>CBU</span></div>
-                            <div class="files-suggested-folder files-suggested-child"><span>📁</span><span>Studio III</span></div>
-                            <div class="files-suggested-folder files-suggested-child"><span>📁</span><span>Thesis</span></div>
-                            <div class="files-suggested-folder files-suggested-child"><span>📁</span><span>Theory</span></div>
-                            <div class="files-suggested-folder files-suggested-child"><span>📁</span><span>References</span></div>
+                            <div class="files-suggested-folder"><span></span><span>CBU</span></div>
+                            <div class="files-suggested-folder files-suggested-child"><span></span><span>Studio III</span></div>
+                            <div class="files-suggested-folder files-suggested-child"><span></span><span>Thesis</span></div>
+                            <div class="files-suggested-folder files-suggested-child"><span></span><span>Theory</span></div>
+                            <div class="files-suggested-folder files-suggested-child"><span></span><span>References</span></div>
                         </div>
                     </div>
                 </div>
@@ -304,7 +304,7 @@
                 <div id="filesBrowser" style="display:none">
                     <div class="files-upload-area">
                         <div class="files-drop-zone" id="filesDropZone">
-                            <span class="files-drop-icon">☁</span>
+                            <span class="files-drop-icon"></span>
                             <span>Drop files here to upload to Dropbox</span>
                         </div>
                         <label class="btn btn-ghost" for="filesUploadInput" style="cursor:pointer">↑ Upload File</label>
@@ -438,12 +438,12 @@
                     </div>
                     <div class="claude-mode-grid">
                         <button class="claude-mode-card" id="claudeSimpleBtn">
-                            <div class="claude-mode-icon">⚡</div>
+                            <div class="claude-mode-icon"></div>
                             <div class="claude-mode-name">Simple</div>
                             <div class="claude-mode-desc">Quick questions answered by Claude Haiku directly in the dashboard. Requires an Anthropic API key in Settings.</div>
                         </button>
                         <button class="claude-mode-card" id="claudeComplexBtn">
-                            <div class="claude-mode-icon">✦</div>
+                            <div class="claude-mode-icon"></div>
                             <div class="claude-mode-name">Complex</div>
                             <div class="claude-mode-desc">Copies your full dashboard context to the clipboard and opens Claude.ai in a new tab.</div>
                         </button>
@@ -487,7 +487,7 @@
                 </div>
             </div>
             <div class="api-warning-header">
-                <span class="api-warning-icon">⚠</span>
+                <span class="api-warning-icon">!</span>
                 <h3 id="apiWarningTitle">You're about to hit your minimum API token amount</h3>
             </div>
             <div class="modal-body" style="text-align:center;padding-top:0">
