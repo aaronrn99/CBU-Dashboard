@@ -2427,3 +2427,41 @@ body {
 @media (max-width: 600px) {
     .api-stats-grid { grid-template-columns: repeat(2, 1fr); }
 }
+
+/* ── Google Drive Status ─────────────────────── */
+.drive-status-row {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 8px 0 2px;
+}
+
+.drive-status-label {
+    font-size: 11px;
+    color: var(--text-3);
+    flex: 1;
+}
+
+.drive-connect-btn {
+    font-size: 11px;
+    padding: 3px 10px;
+}
+
+.drive-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    transition: background 0.3s;
+}
+
+.drive-dot--connecting  { background: var(--text-3); animation: drive-pulse 1.2s infinite; }
+.drive-dot--connected   { background: #4ade80; }
+.drive-dot--saving      { background: #facc15; animation: drive-pulse 0.8s infinite; }
+.drive-dot--disconnected{ background: var(--text-3); }
+.drive-dot--error       { background: #f87171; }
+
+@keyframes drive-pulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.3; }
+}

@@ -15,22 +15,8 @@ const state = {
 };
 
 // ── Persistence ───────────────────────────────
-function save(key, data) {
-    try {
-        localStorage.setItem(`cbu_${key}`, JSON.stringify(data));
-    } catch (e) {
-        console.warn('localStorage write failed:', e);
-    }
-}
-
-function load(key, fallback) {
-    try {
-        const raw = localStorage.getItem(`cbu_${key}`);
-        return raw !== null ? JSON.parse(raw) : fallback;
-    } catch {
-        return fallback;
-    }
-}
+function save(key, data)       { driveSet(key, data); }
+function load(key, fallback)   { return driveGet(key, fallback); }
 
 // ── XSS Protection ───────────────────────────
 function esc(str) {
@@ -400,16 +386,8 @@ function todayDateStr() {
     return new Date().toISOString().slice(0, 10);
 }
 
-function getTodosForDay(dateStr) {
-    try {
-        const raw = localStorage.getItem('cbu_todos_' + dateStr);
-        return raw ? JSON.parse(raw) : [];
-    } catch { return []; }
-}
-
-function saveTodosForDay(dateStr, todos) {
-    localStorage.setItem('cbu_todos_' + dateStr, JSON.stringify(todos));
-}
+function getTodosForDay(dateStr)        { return driveGet('todos_' + dateStr, []); }
+function saveTodosForDay(dateStr, todos) { driveSet('todos_' + dateStr, todos); }
 
 function todosGoDay(delta) {
     const d = new Date(_todosViewDate + 'T12:00:00');
@@ -508,18 +486,8 @@ function renderTodos() {
 const PROJECT_NAMES = ['Project 1', 'Project 2', 'Project 3', 'Project 4'];
 let currentProjectId = null;
 
-function getProjectData(n) {
-    try {
-        const raw = localStorage.getItem(`cbu_project_${n}`);
-        return raw ? JSON.parse(raw) : { notes: [], files: [], deliverables: [] };
-    } catch { return { notes: [], files: [], deliverables: [] }; }
-}
-
-function saveProjectData(n, data) {
-    try {
-        localStorage.setItem(`cbu_project_${n}`, JSON.stringify(data));
-    } catch (e) { console.warn('localStorage write failed:', e); }
-}
+function getProjectData(n)       { return driveGet('project_' + n, { notes: [], files: [], deliverables: [] }); }
+function saveProjectData(n, data) { driveSet('project_' + n, data); }
 
 function renderStudioOverview() {
     const el = document.getElementById('studioOverviewGrid');
@@ -1817,7 +1785,7 @@ function gridDayClick(dateStr) {
 
 let filesPathStack = [{ path: '', label: 'Dropbox' }];
 
-function getDropboxToken()   { return load('dropboxToken', ''); }
+function getDropboxToken()   { return localStorage.getItem('cbu_dropboxToken') || ''; }
 function getAnthropicKey()   { try { return localStorage.getItem('cbu_anthropicKey') || ''; } catch { return ''; } }
 
 // POST to api.dropboxapi.com (JSON → JSON)
@@ -2243,9 +2211,9 @@ function renderSettingsSection() {
     }
 
     // API Credits
-    const apiBalance  = parseFloat(localStorage.getItem('cbu_api_balance')  || '0');
-    const apiWarning  = parseFloat(localStorage.getItem('cbu_api_warning')  || '2');
-    const apiReload   = parseFloat(localStorage.getItem('cbu_api_reload')   || '15');
+    const apiBalance  = parseFloat(driveGet('api_balance', '0'));
+    const apiWarning  = parseFloat(driveGet('api_warning', '2'));
+    const apiReload   = parseFloat(driveGet('api_reload',  '15'));
     const balInput    = document.getElementById('apiBalanceInput');
     const warnInput   = document.getElementById('apiWarningInput');
     const reloadInput = document.getElementById('apiReloadInput');
@@ -2267,7 +2235,7 @@ async function saveDropboxToken() {
     const input = document.getElementById('dropboxTokenInput');
     const raw   = input?.value?.trim();
     if (!raw) { setDropboxStatus('error', 'Paste a token above first.'); return; }
-    save('dropboxToken', raw);
+    localStorage.setItem('cbu_dropboxToken', raw);
     if (input) { input.value = ''; input.placeholder = 'Token saved — paste new token to replace'; }
     setDropboxStatus('saved', 'Token saved. Testing connection…');
     await testDropboxConnection();
@@ -2429,8 +2397,8 @@ async function sendSimpleMessage() {
     if (!text) return;
 
     // Balance warning check
-    const _curBal  = parseFloat(localStorage.getItem('cbu_api_balance')  || '0');
-    const _warnThr = parseFloat(localStorage.getItem('cbu_api_warning') || '2');
+    const _curBal  = parseFloat(driveGet('api_balance',  '0'));
+    const _warnThr = parseFloat(driveGet('api_warning', '2'));
     if (_curBal > 0 && _curBal <= _warnThr) {
         const _proceed = await showApiWarningModal();
         if (!_proceed) return;
@@ -2480,13 +2448,13 @@ async function sendSimpleMessage() {
             const _iT  = data.usage.input_tokens  || 0;
             const _oT  = data.usage.output_tokens || 0;
             const _c   = (_iT / 1e6) * 0.80 + (_oT / 1e6) * 4.00;
-            const _pI  = parseInt(localStorage.getItem('cbu_api_tokens_input')  || '0');
-            const _pO  = parseInt(localStorage.getItem('cbu_api_tokens_output') || '0');
-            localStorage.setItem('cbu_api_tokens_input',  String(_pI + _iT));
-            localStorage.setItem('cbu_api_tokens_output', String(_pO + _oT));
-            const _b = parseFloat(localStorage.getItem('cbu_api_balance') || '0');
+            const _pI  = parseInt(driveGet('api_tokens_input',  '0'));
+            const _pO  = parseInt(driveGet('api_tokens_output', '0'));
+            driveSet('api_tokens_input',  String(_pI + _iT));
+            driveSet('api_tokens_output', String(_pO + _oT));
+            const _b = parseFloat(driveGet('api_balance', '0'));
             if (_b > 0) {
-                localStorage.setItem('cbu_api_balance', String(Math.max(0, _b - _c)));
+                driveSet('api_balance', String(Math.max(0, _b - _c)));
                 if (document.getElementById('settings')?.classList.contains('active')) renderApiCreditSection();
             }
         }
@@ -2517,8 +2485,8 @@ function resolveApiWarning(proceed) {
 function showApiWarningModal() {
     return new Promise(resolve => {
         _apiWarnResolve = resolve;
-        const reload   = parseFloat(localStorage.getItem('cbu_api_reload')   || '15').toFixed(2);
-        const balance  = parseFloat(localStorage.getItem('cbu_api_balance')  || '0').toFixed(2);
+        const reload   = parseFloat(driveGet('api_reload',  '15')).toFixed(2);
+        const balance  = parseFloat(driveGet('api_balance', '0')).toFixed(2);
         const reloadEl = document.getElementById('apiWarnReloadAmt');
         const balEl    = document.getElementById('apiWarnBalanceBadge');
         const mascot   = document.getElementById('apiWarnClawd');
@@ -2538,12 +2506,12 @@ function saveApiCredits() {
     const bal     = Math.max(0, parseFloat(document.getElementById('apiBalanceInput')?.value  || '0'));
     const warning = Math.max(0, parseFloat(document.getElementById('apiWarningInput')?.value  || '2'));
     const reload  = Math.max(0, parseFloat(document.getElementById('apiReloadInput')?.value   || '15'));
-    localStorage.setItem('cbu_api_balance',          String(bal));
-    localStorage.setItem('cbu_api_starting_balance', String(bal));
-    localStorage.setItem('cbu_api_warning',          String(warning));
-    localStorage.setItem('cbu_api_reload',           String(reload));
-    localStorage.setItem('cbu_api_tokens_input',  '0');
-    localStorage.setItem('cbu_api_tokens_output', '0');
+    driveSet('api_balance',          String(bal));
+    driveSet('api_starting_balance', String(bal));
+    driveSet('api_warning',          String(warning));
+    driveSet('api_reload',           String(reload));
+    driveSet('api_tokens_input',  '0');
+    driveSet('api_tokens_output', '0');
     const status = document.getElementById('apiCreditsStatus');
     if (status) { status.className = 'settings-status settings-status-saved'; status.textContent = 'Saved'; }
     renderApiCreditSection();
@@ -2552,12 +2520,12 @@ function saveApiCredits() {
 function renderApiCreditSection() {
     const el = document.getElementById('apiCreditDisplay');
     if (!el) return;
-    const balance  = parseFloat(localStorage.getItem('cbu_api_balance')          || '0');
-    const starting = parseFloat(localStorage.getItem('cbu_api_starting_balance') || '0');
-    const warning  = parseFloat(localStorage.getItem('cbu_api_warning')          || '2');
-    const reload   = parseFloat(localStorage.getItem('cbu_api_reload')           || '15');
-    const tokIn    = parseInt(localStorage.getItem('cbu_api_tokens_input')        || '0');
-    const tokOut   = parseInt(localStorage.getItem('cbu_api_tokens_output')       || '0');
+    const balance  = parseFloat(driveGet('api_balance',          '0'));
+    const starting = parseFloat(driveGet('api_starting_balance', '0'));
+    const warning  = parseFloat(driveGet('api_warning',          '2'));
+    const reload   = parseFloat(driveGet('api_reload',           '15'));
+    const tokIn    = parseInt(driveGet('api_tokens_input',        '0'));
+    const tokOut   = parseInt(driveGet('api_tokens_output',       '0'));
     const costUsed = (tokIn / 1e6) * 0.80 + (tokOut / 1e6) * 4.00;
     const pct      = starting > 0 ? Math.min(100, Math.max(0, (balance / starting) * 100)) : (balance > 0 ? 100 : 0);
     el.innerHTML = `
@@ -2830,5 +2798,4 @@ function closeSidebar() {
     document.getElementById('overlayBg')?.classList.remove('open');
 }
 
-// ── Bootstrap ────────────────────────────────
-document.addEventListener('DOMContentLoaded', init);
+// Bootstrap is handled by drive.js — it calls init() after loading Drive data.

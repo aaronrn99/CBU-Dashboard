@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="css/style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@900&display=swap" rel="stylesheet">
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
 
@@ -92,6 +93,11 @@
         </ul>
         <div class="sidebar-footer">
             <button class="btn btn-ghost full-width" id="canvasSettingsBtn">Canvas Settings</button>
+            <div class="drive-status-row">
+                <span class="drive-dot drive-dot--connecting" id="driveStatusDot" title="Connecting to Google Drive…"></span>
+                <span class="drive-status-label" id="driveStatusLabel">Drive…</span>
+                <button class="btn btn-ghost drive-connect-btn" id="driveConnectBtn" style="display:none">Connect</button>
+            </div>
         </div>
     </nav>
 
@@ -649,6 +655,8 @@
     <!-- Toast notification -->
     <div class="claude-toast" id="claudeToast" role="status" aria-live="polite"></div>
 
+    <script src="js/config.js"></script>
     <script src="js/app.js"></script>
+    <script src="js/drive.js"></script>
 </body>
 </html>
