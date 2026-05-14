@@ -38,45 +38,30 @@ function driveSet(key, data) {
 
 // ── Boot ───────────────────────────────────────
 
-document.addEventListener('DOMContentLoaded', () => {
-    document.getElementById('driveConnectBtn')?.addEventListener('click', _manualConnect);
-    _driveInit();
-});
+document.addEventListener('DOMContentLoaded', _driveInit);
 
 async function _driveInit() {
     _setStatus('connecting');
     try {
         await _waitForGIS();
-        await _getToken(true);
+        // Try silent first; if no existing session, auto-trigger the popup
+        try {
+            await _getToken(true);
+        } catch {
+            await _getToken(false);
+        }
         await _loadOrCreateFile();
         _migrateFromLocalStorage();
         _connected = true;
         _setStatus('connected');
-        document.getElementById('driveConnectBtn').style.display = 'none';
-    } catch {
-        _setStatus('disconnected');
-        document.getElementById('driveConnectBtn').style.display = '';
+    } catch (err) {
+        console.warn('[Drive] Sign-in failed:', err.message);
+        _setStatus('error');
     }
     // Always boot the app regardless of Drive status
     init();
     // Proactively refresh token every 45 min
     setInterval(() => _getToken(true).catch(() => {}), 45 * 60 * 1000);
-}
-
-async function _manualConnect() {
-    _setStatus('connecting');
-    try {
-        await _waitForGIS();
-        await _getToken(false);
-        await _loadOrCreateFile();
-        _migrateFromLocalStorage();
-        _connected = true;
-        _setStatus('connected');
-        document.getElementById('driveConnectBtn').style.display = 'none';
-    } catch (err) {
-        console.warn('[Drive] Connect failed:', err.message);
-        _setStatus('error');
-    }
 }
 
 // ── OAuth ──────────────────────────────────────
@@ -212,11 +197,10 @@ function _setStatus(s) {
     if (!dot) return;
     dot.className = 'drive-dot drive-dot--' + s;
     const titles = {
-        connecting:   'Connecting to Google Drive…',
-        connected:    'Google Drive synced',
-        saving:       'Saving to Google Drive…',
-        disconnected: 'Not connected — click Connect',
-        error:        'Google Drive error — click Connect',
+        connecting: 'Connecting to Google Drive…',
+        connected:  'Google Drive synced',
+        saving:     'Saving to Google Drive…',
+        error:      'Google Drive error',
     };
     const labels = {
         connecting: 'Drive…', connected: 'Drive',
