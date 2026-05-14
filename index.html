@@ -316,6 +316,18 @@
                     <h2>Settings</h2>
                 </div>
 
+                <!-- PIN Lock card -->
+                <div class="settings-card">
+                    <div class="settings-card-header">
+                        <h3>PIN Lock</h3>
+                    </div>
+                    <p class="settings-description">Change your 6-digit dashboard PIN.</p>
+                    <div class="settings-actions">
+                        <button class="btn btn-primary" id="changePinBtn">Change PIN</button>
+                    </div>
+                    <div class="settings-status" id="pinChangeStatus"></div>
+                </div>
+
                 <!-- Google Drive card -->
                 <div class="settings-card">
                     <div class="settings-card-header">
@@ -618,6 +630,40 @@
             <div class="modal-footer">
                 <button class="btn btn-ghost" id="cancelSchedCustomModal">Cancel</button>
                 <button class="btn btn-primary" id="saveSchedCustomEvent">Add Event</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- PIN Lock Screen -->
+    <div id="pinScreen" style="display:none">
+        <div class="pin-screen">
+            <div class="pin-brand">
+                <div class="pin-brand-title">CBU Dashboard</div>
+                <div class="pin-brand-sub">Architecture · Fall 2026</div>
+            </div>
+            <div class="pin-title" id="pinTitle">Enter PIN</div>
+            <div class="pin-dots" role="status" aria-live="polite">
+                <span class="pin-dot"></span>
+                <span class="pin-dot"></span>
+                <span class="pin-dot"></span>
+                <span class="pin-dot"></span>
+                <span class="pin-dot"></span>
+                <span class="pin-dot"></span>
+            </div>
+            <div class="pin-subtitle" id="pinSubtitle"></div>
+            <div class="pin-pad" role="group" aria-label="Number pad">
+                <button class="pin-key" onclick="pinInput('1')">1</button>
+                <button class="pin-key" onclick="pinInput('2')">2</button>
+                <button class="pin-key" onclick="pinInput('3')">3</button>
+                <button class="pin-key" onclick="pinInput('4')">4</button>
+                <button class="pin-key" onclick="pinInput('5')">5</button>
+                <button class="pin-key" onclick="pinInput('6')">6</button>
+                <button class="pin-key" onclick="pinInput('7')">7</button>
+                <button class="pin-key" onclick="pinInput('8')">8</button>
+                <button class="pin-key" onclick="pinInput('9')">9</button>
+                <button class="pin-key pin-key--ghost" disabled aria-hidden="true"></button>
+                <button class="pin-key" onclick="pinInput('0')">0</button>
+                <button class="pin-key pin-key--action" onclick="pinBackspace()" aria-label="Backspace">⌫</button>
             </div>
         </div>
     </div>

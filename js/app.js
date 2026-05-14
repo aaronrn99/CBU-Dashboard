@@ -29,6 +29,172 @@ function esc(str) {
         .replace(/'/g, '&#039;');
 }
 
+// ── PIN Lock ──────────────────────────────────
+
+const PIN_HASH_KEY    = 'cbu_pin_hash';
+const PIN_SESSION_KEY = 'cbu_pin_session';
+
+async function pinSHA256(str) {
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+let _pinMode  = 'verify'; // verify | create | confirm | change_current | change_new | change_confirm
+let _pinEntry = '';
+let _pinFirst = '';
+
+async function pinBoot() {
+    if (sessionStorage.getItem(PIN_SESSION_KEY) === 'ok') {
+        driveStart();
+        return;
+    }
+    const stored = localStorage.getItem(PIN_HASH_KEY);
+    _showPinScreen(stored ? 'verify' : 'create');
+}
+
+function _showPinScreen(mode) {
+    _pinMode  = mode;
+    _pinEntry = '';
+    _pinFirst = '';
+    const el = document.getElementById('pinScreen');
+    if (el) el.style.display = '';
+    _updatePinUI();
+}
+
+function _hidePinScreen() {
+    const el = document.getElementById('pinScreen');
+    if (el) el.style.display = 'none';
+}
+
+function _updatePinUI() {
+    const titles = {
+        verify:         'Enter PIN',
+        create:         'Create PIN',
+        confirm:        'Confirm PIN',
+        change_current: 'Enter Current PIN',
+        change_new:     'Enter New PIN',
+        change_confirm: 'Confirm New PIN',
+    };
+    const titleEl = document.getElementById('pinTitle');
+    if (titleEl) titleEl.textContent = titles[_pinMode] || 'Enter PIN';
+    document.querySelectorAll('.pin-dot').forEach((d, i) => {
+        d.classList.toggle('filled', i < _pinEntry.length);
+        d.classList.remove('error', 'success');
+    });
+    const sub = document.getElementById('pinSubtitle');
+    if (sub && !sub.dataset.err) sub.textContent = '';
+}
+
+function pinInput(digit) {
+    if (_pinEntry.length >= 6) return;
+    _pinEntry += String(digit);
+    _updatePinUI();
+    if (_pinEntry.length === 6) setTimeout(pinSubmit, 120);
+}
+
+function pinBackspace() {
+    if (!_pinEntry.length) return;
+    _pinEntry = _pinEntry.slice(0, -1);
+    _updatePinUI();
+}
+
+async function pinSubmit() {
+    const hash = await pinSHA256(_pinEntry);
+
+    if (_pinMode === 'verify') {
+        if (hash === localStorage.getItem(PIN_HASH_KEY)) {
+            _pinSuccessUnlock();
+        } else {
+            _pinError('Incorrect PIN');
+        }
+
+    } else if (_pinMode === 'create') {
+        _pinFirst = _pinEntry;
+        _pinEntry = '';
+        _pinMode  = 'confirm';
+        _updatePinUI();
+
+    } else if (_pinMode === 'confirm') {
+        if (_pinEntry === _pinFirst) {
+            localStorage.setItem(PIN_HASH_KEY, hash);
+            _pinSuccessUnlock();
+        } else {
+            _pinFirst = '';
+            _pinMode  = 'create';
+            _pinError("PINs don't match");
+        }
+
+    } else if (_pinMode === 'change_current') {
+        if (hash === localStorage.getItem(PIN_HASH_KEY)) {
+            _pinEntry = '';
+            _pinMode  = 'change_new';
+            _updatePinUI();
+        } else {
+            _pinError('Incorrect PIN');
+        }
+
+    } else if (_pinMode === 'change_new') {
+        _pinFirst = _pinEntry;
+        _pinEntry = '';
+        _pinMode  = 'change_confirm';
+        _updatePinUI();
+
+    } else if (_pinMode === 'change_confirm') {
+        if (_pinEntry === _pinFirst) {
+            localStorage.setItem(PIN_HASH_KEY, hash);
+            _hidePinScreen();
+            _pinSetStatus('PIN updated successfully.');
+        } else {
+            _pinFirst = '';
+            _pinMode  = 'change_new';
+            _pinError("PINs don't match");
+        }
+    }
+}
+
+function _pinSuccessUnlock() {
+    document.querySelectorAll('.pin-dot').forEach(d => d.classList.add('success'));
+    setTimeout(() => {
+        _hidePinScreen();
+        sessionStorage.setItem(PIN_SESSION_KEY, 'ok');
+        driveStart();
+    }, 380);
+}
+
+function _pinError(msg) {
+    const dots = document.querySelectorAll('.pin-dot');
+    dots.forEach(d => d.classList.add('error'));
+    const sub = document.getElementById('pinSubtitle');
+    if (sub) { sub.textContent = msg; sub.style.color = 'var(--red)'; sub.dataset.err = '1'; }
+    setTimeout(() => {
+        dots.forEach(d => { d.classList.remove('error', 'filled'); });
+        _pinEntry = '';
+        if (sub) { sub.textContent = ''; sub.style.color = ''; delete sub.dataset.err; }
+    }, 600);
+}
+
+function _pinSetStatus(msg) {
+    const el = document.getElementById('pinChangeStatus');
+    if (!el) return;
+    el.textContent = msg;
+    el.className = 'settings-status settings-status-saved';
+    setTimeout(() => { el.textContent = ''; el.className = 'settings-status'; }, 3000);
+}
+
+function openChangePinFlow() {
+    _showPinScreen('change_current');
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    pinBoot();
+    document.addEventListener('keydown', e => {
+        const screen = document.getElementById('pinScreen');
+        if (!screen || screen.style.display === 'none') return;
+        if (e.key >= '0' && e.key <= '9') pinInput(e.key);
+        else if (e.key === 'Backspace') pinBackspace();
+    });
+});
+
 // ── Init ──────────────────────────────────────
 function init() {
     state.notes          = load('notes', []);
@@ -2556,6 +2722,9 @@ function bindEvents() {
     document.getElementById('filesRefreshBtn')?.addEventListener('click', () => {
         loadFilesFolder(filesPathStack[filesPathStack.length - 1].id);
     });
+
+    // Settings — PIN
+    document.getElementById('changePinBtn')?.addEventListener('click', openChangePinFlow);
 
     // Settings — Anthropic
     document.getElementById('saveAnthropicKeyBtn')?.addEventListener('click', saveAnthropicKey);

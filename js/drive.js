@@ -41,8 +41,10 @@ function driveSet(key, data) {
 document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('driveOverlayBtn')?.addEventListener('click', driveConnect);
     document.getElementById('driveSettingsConnectBtn')?.addEventListener('click', driveConnect);
-    _driveInit();
+    // _driveInit() is called by pin.js via driveStart() after PIN verification
 });
+
+function driveStart() { _driveInit(); }
 
 async function _driveInit() {
     _setStatus('connecting');
