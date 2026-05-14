@@ -38,30 +38,48 @@ function driveSet(key, data) {
 
 // ── Boot ───────────────────────────────────────
 
-document.addEventListener('DOMContentLoaded', _driveInit);
+document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('driveOverlayBtn')?.addEventListener('click', driveConnect);
+    document.getElementById('driveSettingsConnectBtn')?.addEventListener('click', driveConnect);
+    _driveInit();
+});
 
 async function _driveInit() {
     _setStatus('connecting');
     try {
         await _waitForGIS();
-        // Try silent first; if no existing session, auto-trigger the popup
-        try {
-            await _getToken(true);
-        } catch {
-            await _getToken(false);
-        }
+        await _getToken(true); // silent only — never auto-popup
         await _loadOrCreateFile();
         _migrateFromLocalStorage();
         _connected = true;
         _setStatus('connected');
-    } catch (err) {
-        console.warn('[Drive] Sign-in failed:', err.message);
-        _setStatus('error');
+        _hideOverlay();
+    } catch {
+        // No existing session — show overlay, let user initiate
+        _setStatus('disconnected');
+        _showOverlay();
     }
-    // Always boot the app regardless of Drive status
+    // Boot the app (falls back to localStorage if Drive not connected)
     init();
     // Proactively refresh token every 45 min
     setInterval(() => _getToken(true).catch(() => {}), 45 * 60 * 1000);
+}
+
+async function driveConnect() {
+    _setStatus('connecting');
+    try {
+        await _waitForGIS();
+        await _getToken(false); // user-initiated — show account picker
+        await _loadOrCreateFile();
+        _migrateFromLocalStorage();
+        _connected = true;
+        _setStatus('connected');
+        _hideOverlay();
+        init(); // re-init to populate state from Drive data
+    } catch (err) {
+        console.warn('[Drive] Connect failed:', err.message);
+        _setStatus('error');
+    }
 }
 
 // ── OAuth ──────────────────────────────────────
@@ -189,23 +207,47 @@ function _migrateFromLocalStorage() {
     }
 }
 
+// ── Overlay ────────────────────────────────────
+
+function _showOverlay() {
+    const el = document.getElementById('driveOverlay');
+    if (el) el.style.display = '';
+}
+
+function _hideOverlay() {
+    const el = document.getElementById('driveOverlay');
+    if (el) el.style.display = 'none';
+}
+
 // ── Status UI ──────────────────────────────────
 
 function _setStatus(s) {
     const dot   = document.getElementById('driveStatusDot');
     const label = document.getElementById('driveStatusLabel');
-    if (!dot) return;
-    dot.className = 'drive-dot drive-dot--' + s;
+    const sDot  = document.getElementById('driveSettingsDot');
+    const sMsg  = document.getElementById('driveSettingsStatus');
+
     const titles = {
-        connecting: 'Connecting to Google Drive…',
-        connected:  'Google Drive synced',
-        saving:     'Saving to Google Drive…',
-        error:      'Google Drive error',
+        connecting:   'Connecting to Google Drive…',
+        connected:    'Google Drive synced',
+        saving:       'Saving to Google Drive…',
+        disconnected: 'Not connected to Google Drive',
+        error:        'Google Drive error',
     };
     const labels = {
         connecting: 'Drive…', connected: 'Drive',
         saving: 'Saving…', disconnected: 'Drive', error: 'Drive error',
     };
-    dot.title = titles[s] || '';
-    if (label) label.textContent = labels[s] || 'Drive';
+    const sMsgs = {
+        connecting:   'Connecting…',
+        connected:    'Connected and syncing.',
+        saving:       'Saving…',
+        disconnected: 'Not connected. Click Reconnect to sign in.',
+        error:        'Connection error. Click Reconnect to try again.',
+    };
+
+    if (dot)   { dot.className = 'drive-dot drive-dot--' + s; dot.title = titles[s] || ''; }
+    if (label) { label.textContent = labels[s] || 'Drive'; }
+    if (sDot)  { sDot.className = `settings-status-dot${s === 'connected' || s === 'saving' ? ' connected' : s === 'error' ? ' error' : ''}`; }
+    if (sMsg)  { sMsg.className = `settings-status${s === 'connected' ? ' settings-status-saved' : s === 'error' ? ' settings-status-error' : ''}`; sMsg.textContent = sMsgs[s] || ''; }
 }
