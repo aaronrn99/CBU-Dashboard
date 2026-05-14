@@ -5,7 +5,7 @@
 // ================================================
 
 const DRIVE_FILE  = 'cbu-dashboard.json';
-const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
+const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/drive.file';
 
 let _token      = null;
 let _fileId     = null;
@@ -218,6 +218,12 @@ function _hideOverlay() {
     const el = document.getElementById('driveOverlay');
     if (el) el.style.display = 'none';
 }
+
+// ── Public helpers for app.js ──────────────────
+
+function driveReq(url, opts)  { return _req(url, opts); }
+function getDriveToken()      { return _token; }
+function isDriveConnected()   { return _connected; }
 
 // ── Status UI ──────────────────────────────────
 

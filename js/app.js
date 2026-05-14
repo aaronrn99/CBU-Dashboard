@@ -579,23 +579,16 @@ function renderStudioNotes() {
 function renderStudioFiles() {
     const contentEl = document.getElementById('studioFilesContent');
     if (!contentEl) return;
-    if (!getDropboxToken()) {
-        contentEl.innerHTML = `<div style="display:flex;align-items:center;gap:12px;padding:6px 0 14px">
-            <span style="font-size:13px;color:var(--text-2)">Connect Dropbox in Settings to upload files.</span>
-            <button class="btn btn-ghost" style="font-size:12px" onclick="showSection('settings')">Connect →</button>
-        </div>`;
-    } else {
-        contentEl.innerHTML = `
-        <div class="files-upload-area" style="margin-bottom:12px">
-            <div class="files-drop-zone" id="studioDropZone">
-                <span class="files-drop-icon"></span>
-                <span>Drop files here to upload to Dropbox</span>
-            </div>
-            <label class="btn btn-ghost" for="studioUploadInput" style="cursor:pointer">↑ Upload File</label>
-            <input type="file" id="studioUploadInput" multiple style="display:none" aria-label="Upload files">
-        </div>`;
-        bindStudioUpload();
-    }
+    contentEl.innerHTML = `
+    <div class="files-upload-area" style="margin-bottom:12px">
+        <div class="files-drop-zone" id="studioDropZone">
+            <span class="files-drop-icon"></span>
+            <span>Drop files here to upload to Google Drive</span>
+        </div>
+        <label class="btn btn-ghost" for="studioUploadInput" style="cursor:pointer">↑ Upload File</label>
+        <input type="file" id="studioUploadInput" multiple style="display:none" aria-label="Upload files">
+    </div>`;
+    bindStudioUpload();
     renderStudioFilesList();
 }
 
@@ -632,7 +625,7 @@ function renderStudioFilesList() {
 function downloadStudioFile(id) {
     const data = getProjectData(currentProjectId);
     const file = data.files.find(f => f.id === id);
-    if (file) downloadDropboxFile(file.path, file.name, null);
+    if (file && file.driveId) downloadDriveFile(file.driveId, file.name, null);
 }
 
 function deleteStudioFile(id) {
@@ -665,54 +658,50 @@ function bindStudioUpload() {
 }
 
 async function handleStudioUpload(files) {
-    if (!getDropboxToken() || !currentProjectId) return;
+    if (!isDriveConnected() || !currentProjectId) return;
     const fileArray = Array.from(files).filter(f => f.size >= 0);
     if (!fileArray.length) return;
-
     const progressEl = document.getElementById('studioUploadProgress');
     if (!progressEl) return;
-
-    const ts         = Date.now();
-    const items      = fileArray.map((file, i) => ({ file, uid: `stu-${ts}-${i}`, id: ts + i }));
-    const folderPath = `/CBU Dashboard/Project ${currentProjectId}`;
-
+    const ts    = Date.now();
+    const items = fileArray.map((file, i) => ({ file, uid: `stu-${ts}-${i}`, id: ts + i }));
     progressEl.innerHTML = `<div class="files-upload-block" style="margin-bottom:12px">
         ${items.map(item => `
         <div class="files-upload-item">
             <span class="files-upload-name" title="${esc(item.file.name)}">${esc(item.file.name)}</span>
-            <div class="files-upload-bar-wrap">
-                <div class="files-upload-bar" id="${item.uid}-bar" style="width:0%"></div>
-            </div>
+            <div class="files-upload-bar-wrap"><div class="files-upload-bar" id="${item.uid}-bar" style="width:0%"></div></div>
             <span class="files-upload-status" id="${item.uid}-status">0%</span>
         </div>`).join('')}
     </div>`;
-
-    await Promise.allSettled(items.map(async item => {
-        const barEl    = document.getElementById(`${item.uid}-bar`);
-        const statusEl = document.getElementById(`${item.uid}-status`);
-        try {
-            const result = await uploadFileToDropbox(item.file, folderPath, pct => {
-                if (barEl)    barEl.style.width   = `${pct}%`;
-                if (statusEl) statusEl.textContent = `${pct}%`;
-            });
-            if (barEl)    barEl.style.width = '100%';
-            if (statusEl) { statusEl.textContent = 'Done'; statusEl.className = 'files-upload-status done'; }
-            const data = getProjectData(currentProjectId);
-            data.files.unshift({
-                id:         item.id,
-                name:       item.file.name,
-                path:       result.path_lower || `${folderPath.toLowerCase()}/${item.file.name.toLowerCase()}`,
-                size:       item.file.size,
-                uploadedAt: new Date().toISOString(),
-            });
-            saveProjectData(currentProjectId, data);
-            renderStudioFilesList();
-        } catch {
-            if (barEl)    { barEl.style.background = 'var(--red)'; barEl.style.width = '100%'; }
-            if (statusEl) { statusEl.textContent = 'Failed'; statusEl.className = 'files-upload-status error'; }
-        }
-    }));
-
+    try {
+        const cbuId  = await getCBUFolder();
+        const projId = await getOrCreateSubfolder(cbuId, `Project ${currentProjectId}`);
+        await Promise.allSettled(items.map(async item => {
+            const barEl    = document.getElementById(`${item.uid}-bar`);
+            const statusEl = document.getElementById(`${item.uid}-status`);
+            try {
+                const result = await uploadFileToDrive(item.file, projId, pct => {
+                    if (barEl)    barEl.style.width   = `${pct}%`;
+                    if (statusEl) statusEl.textContent = `${pct}%`;
+                });
+                if (barEl)    barEl.style.width = '100%';
+                if (statusEl) { statusEl.textContent = 'Done'; statusEl.className = 'files-upload-status done'; }
+                const data = getProjectData(currentProjectId);
+                data.files.unshift({
+                    id:         item.id,
+                    name:       item.file.name,
+                    driveId:    result.id,
+                    size:       item.file.size,
+                    uploadedAt: new Date().toISOString(),
+                });
+                saveProjectData(currentProjectId, data);
+                renderStudioFilesList();
+            } catch {
+                if (barEl)    { barEl.style.background = 'var(--red)'; barEl.style.width = '100%'; }
+                if (statusEl) { statusEl.textContent = 'Failed'; statusEl.className = 'files-upload-status error'; }
+            }
+        }));
+    } catch (err) { console.warn('[Drive] Studio upload failed:', err.message); }
     setTimeout(() => { if (progressEl) progressEl.innerHTML = ''; }, 2500);
 }
 
@@ -1781,47 +1770,41 @@ function gridDayClick(dateStr) {
     setTimeout(() => document.getElementById('calEventLabel').focus(), 60);
 }
 
-// ── Files & Dropbox ───────────────────────────
+// ── Files & Google Drive ──────────────────────
 
-let filesPathStack = [{ path: '', label: 'Dropbox' }];
+let filesPathStack = [{ id: null, label: 'CBU Dashboard' }];
+let _cbuFolderId   = null;
+let _filesEntries  = [];
 
-function getDropboxToken()   { return localStorage.getItem('cbu_dropboxToken') || ''; }
-function getAnthropicKey()   { try { return localStorage.getItem('cbu_anthropicKey') || ''; } catch { return ''; } }
+function getAnthropicKey() { try { return localStorage.getItem('cbu_anthropicKey') || ''; } catch { return ''; } }
 
-// POST to api.dropboxapi.com (JSON → JSON)
-async function dropboxAPI(endpoint, body = {}) {
-    const token = getDropboxToken();
-    if (!token) throw new Error('No Dropbox token — go to Settings to connect.');
-    const res = await fetch(`https://api.dropboxapi.com/2/${endpoint}`, {
+async function getCBUFolder() {
+    if (_cbuFolderId) return _cbuFolderId;
+    const q   = encodeURIComponent("name='CBU Dashboard' and mimeType='application/vnd.google-apps.folder' and trashed=false");
+    const res = await driveReq(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id)&spaces=drive`);
+    if (!res.ok) throw new Error('Drive folder search failed');
+    const { files } = await res.json();
+    if (files.length) { _cbuFolderId = files[0].id; return _cbuFolderId; }
+    const cr = await driveReq('https://www.googleapis.com/drive/v3/files', {
         method:  'POST',
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body:    JSON.stringify(body),
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ name: 'CBU Dashboard', mimeType: 'application/vnd.google-apps.folder' }),
     });
-    if (!res.ok) {
-        let msg = `Dropbox ${res.status}`;
-        try { const j = await res.json(); msg = j.error_summary || j.user_message || msg; } catch {}
-        throw new Error(msg);
-    }
-    return res.json();
+    if (!cr.ok) throw new Error('Could not create CBU Dashboard folder');
+    _cbuFolderId = (await cr.json()).id;
+    return _cbuFolderId;
 }
 
-// POST to content.dropboxapi.com — returns raw image blob for thumbnails
-async function dropboxThumbnail(path) {
-    const token = getDropboxToken();
-    const res = await fetch('https://content.dropboxapi.com/2/files/get_thumbnail', {
+async function getOrCreateSubfolder(parentId, name) {
+    const q   = encodeURIComponent(`name='${name}' and '${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`);
+    const res = await driveReq(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id)&spaces=drive`);
+    if (res.ok) { const { files } = await res.json(); if (files.length) return files[0].id; }
+    const cr = await driveReq('https://www.googleapis.com/drive/v3/files', {
         method:  'POST',
-        headers: {
-            'Authorization':   `Bearer ${token}`,
-            'Dropbox-API-Arg': JSON.stringify({ path, format: 'jpeg', size: 'w256h256', mode: 'strict' }),
-        },
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ name, mimeType: 'application/vnd.google-apps.folder', parents: [parentId] }),
     });
-    if (!res.ok) return null;
-    return URL.createObjectURL(await res.blob());
-}
-
-async function dropboxTempLink(path) {
-    const data = await dropboxAPI('files/get_temporary_link', { path });
-    return data.link;
+    return (await cr.json()).id;
 }
 
 const FILE_ICONS = {
@@ -1837,144 +1820,116 @@ const FILE_ICONS = {
     zip:'', rar:'', '7z':'',
 };
 
-function fileTypeIcon(entry) {
-    if (entry['.tag'] === 'folder') return '';
-    const ext = (entry.name.split('.').pop() || '').toLowerCase();
+function fileExtIcon(name) {
+    const ext = (name.split('.').pop() || '').toLowerCase();
     return FILE_ICONS[ext] || '';
 }
 
-function isThumbable(name) { return /\.(jpg|jpeg|png|webp|gif)$/i.test(name); }
+function isDriveFolder(f) { return f.mimeType === 'application/vnd.google-apps.folder'; }
 
 // ── Render entry point ─────────────────────────
-function renderFiles() {
+
+async function renderFiles() {
     const noToken    = document.getElementById('filesNoToken');
     const browser    = document.getElementById('filesBrowser');
     const refreshBtn = document.getElementById('filesRefreshBtn');
-    const hasToken   = !!getDropboxToken();
-    if (noToken)    noToken.style.display    = hasToken ? 'none'  : 'block';
-    if (browser)    browser.style.display    = hasToken ? 'block' : 'none';
-    if (refreshBtn) refreshBtn.style.display = hasToken ? ''      : 'none';
-    if (hasToken) {
-        filesPathStack = [{ path: '', label: 'Dropbox' }];
-        loadFilesFolder('');
+    if (!isDriveConnected()) {
+        if (noToken)    noToken.style.display    = 'block';
+        if (browser)    browser.style.display    = 'none';
+        if (refreshBtn) refreshBtn.style.display = 'none';
+        return;
+    }
+    if (noToken)    noToken.style.display    = 'none';
+    if (browser)    browser.style.display    = 'block';
+    if (refreshBtn) refreshBtn.style.display = '';
+    try {
+        const folderId = await getCBUFolder();
+        filesPathStack = [{ id: folderId, label: 'CBU Dashboard' }];
+        await loadFilesFolder(folderId);
+    } catch (err) {
+        const grid = document.getElementById('filesGrid');
+        if (grid) grid.innerHTML = `<div class="empty-state"><div class="empty-state-text">${esc(err.message)}</div></div>`;
     }
 }
 
 // ── Folder loading ─────────────────────────────
-async function loadFilesFolder(path) {
+
+async function loadFilesFolder(folderId) {
     const grid = document.getElementById('filesGrid');
     if (!grid) return;
-    grid.innerHTML = `<div class="files-loading">
-        <div class="files-loading-dots"><span></span><span></span><span></span></div>Loading…</div>`;
+    grid.innerHTML = `<div class="files-loading"><div class="files-loading-dots"><span></span><span></span><span></span></div>Loading…</div>`;
     updateFilesBreadcrumb();
     try {
-        // Dropbox requires path="" for root (not "/" or null); recursive must be explicit false
-        const result = await dropboxAPI('files/list_folder', {
-            path:      path === '' ? '' : path,
-            recursive: false,
-            limit:     100,
-        });
-        renderFilesGrid(result.entries || []);
+        const q   = encodeURIComponent(`'${folderId}' in parents and trashed=false`);
+        const res = await driveReq(
+            `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name,mimeType,size,modifiedTime,thumbnailLink)&orderBy=folder,name&pageSize=100&spaces=drive`
+        );
+        if (!res.ok) throw new Error('Drive list failed: ' + res.status);
+        const { files } = await res.json();
+        renderFilesGrid(files || []);
     } catch (err) {
-        grid.innerHTML = `<div class="empty-state">
-            <div class="empty-state-icon">!</div>
-            <div class="empty-state-text">${esc(err.message)}</div>
-        </div>`;
+        grid.innerHTML = `<div class="empty-state"><div class="empty-state-icon">!</div><div class="empty-state-text">${esc(err.message)}</div></div>`;
     }
 }
 
-// ── Grid rendering ────────────────────────────
-let _filesEntries = [];  // cached so the click handler can look up by idx
+// ── Grid rendering ─────────────────────────────
 
-function renderFilesGrid(entries) {
+function renderFilesGrid(files) {
     const grid = document.getElementById('filesGrid');
     if (!grid) return;
-    if (!entries.length) {
-        grid.innerHTML = `<div class="empty-state">
-            <div class="empty-state-icon"></div>
-            <div class="empty-state-text">This folder is empty.</div>
-        </div>`;
+    if (!files.length) {
+        grid.innerHTML = `<div class="empty-state"><div class="empty-state-icon"></div><div class="empty-state-text">This folder is empty.</div></div>`;
         return;
     }
-    const sorted = [...entries].sort((a, b) => {
-        const af = a['.tag'] === 'folder', bf = b['.tag'] === 'folder';
-        if (af !== bf) return af ? -1 : 1;
-        return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
-    });
-    _filesEntries = sorted;
-
-    grid.innerHTML = sorted.map((entry, idx) => {
-        const isFolder = entry['.tag'] === 'folder';
-        const modified = entry.server_modified
-            ? new Date(entry.server_modified).toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' })
+    _filesEntries = files;
+    grid.innerHTML = files.map((f, idx) => {
+        const isFolder = isDriveFolder(f);
+        const modified = f.modifiedTime
+            ? new Date(f.modifiedTime).toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' })
             : '';
-        const meta = [modified, entry.size ? fmtFileSize(entry.size) : ''].filter(Boolean).join(' · ');
+        const size   = f.size ? fmtFileSize(parseInt(f.size)) : '';
+        const meta   = [modified, size].filter(Boolean).join(' · ');
         const footer = isFolder
             ? `<div class="files-card-meta">${meta}</div>`
             : `<div class="files-card-footer">
                    <span class="files-card-meta">${meta}</span>
-                   <button class="files-dl-btn" data-dl-idx="${idx}" title="Download ${esc(entry.name)}" aria-label="Download">↓</button>
+                   <button class="files-dl-btn" data-dl-idx="${idx}" title="Download ${esc(f.name)}" aria-label="Download">↓</button>
                </div>`;
+        const preview = f.thumbnailLink
+            ? `<img src="${f.thumbnailLink}" alt="" class="files-card-thumb" onerror="this.parentNode.textContent='${isFolder ? '' : fileExtIcon(f.name)}'">`
+            : (isFolder ? '' : fileExtIcon(f.name));
         return `
-        <div class="files-card" data-idx="${idx}"
-             data-path="${esc(entry.path_lower || '')}"
-             data-name="${esc(entry.name)}"
-             data-folder="${isFolder ? '1' : ''}"
-             title="${esc(entry.name)}">
-            <div class="files-card-preview">${fileTypeIcon(entry)}</div>
+        <div class="files-card" data-idx="${idx}" data-id="${esc(f.id)}" data-name="${esc(f.name)}"
+             data-folder="${isFolder ? '1' : ''}" data-mime="${esc(f.mimeType)}" title="${esc(f.name)}">
+            <div class="files-card-preview">${preview}</div>
             <div class="files-card-info">
-                <div class="files-card-name">${esc(entry.name)}</div>
+                <div class="files-card-name">${esc(f.name)}</div>
                 ${footer}
             </div>
         </div>`;
     }).join('');
-
-    // Persistent onclick — download clicks must not consume the listener
     grid.onclick = filesGridClick;
-
-    // Async thumbnails for images
-    sorted.forEach((entry, idx) => {
-        if (isThumbable(entry.name) && entry.path_lower) loadThumbnailCard(entry.path_lower, idx);
-    });
 }
 
 function filesGridClick(e) {
-    // Download button takes priority over card navigation
     const dlBtn = e.target.closest('.files-dl-btn');
     if (dlBtn) {
-        const entry = _filesEntries[+dlBtn.dataset.dlIdx];
-        if (entry) downloadDropboxFile(entry.path_lower, entry.name, dlBtn);
+        const f = _filesEntries[+dlBtn.dataset.dlIdx];
+        if (f) downloadDriveFile(f.id, f.name, dlBtn);
         return;
     }
     const card = e.target.closest('.files-card');
     if (!card) return;
-    const path = card.dataset.path;
-    const name = card.dataset.name;
     if (card.dataset.folder) {
-        filesPathStack.push({ path, label: name });
-        loadFilesFolder(path);
+        filesPathStack.push({ id: card.dataset.id, label: card.dataset.name });
+        loadFilesFolder(card.dataset.id);
     } else {
-        openDropboxFile(path, name);
+        openDriveFile(card.dataset.id, card.dataset.name, card.dataset.mime);
     }
 }
 
-// ── Thumbnail loading ─────────────────────────
-async function loadThumbnailCard(path, idx) {
-    const grid = document.getElementById('filesGrid');
-    if (!grid) return;
-    const preview = grid.querySelector(`[data-idx="${idx}"] .files-card-preview`);
-    if (!preview) return;
-    try {
-        const url = await dropboxThumbnail(path);
-        if (url && preview.isConnected) {
-            preview.innerHTML =
-                `<img src="${url}" alt="" class="files-card-thumb"
-                    onerror="this.parentNode.textContent=''">`;
-        }
-    } catch { /* keep icon */ }
-}
-
 // ── Breadcrumb ────────────────────────────────
+
 function updateFilesBreadcrumb() {
     const el = document.getElementById('filesBreadcrumb');
     if (!el) return;
@@ -1985,41 +1940,30 @@ function updateFilesBreadcrumb() {
         return `<span class="files-bc-item files-bc-link" data-bc-idx="${i}">${label}</span>`
              + `<span class="files-bc-sep">›</span>`;
     }).join('');
-
-    // Delegate breadcrumb clicks
     el.onclick = null;
     el.addEventListener('click', e => {
         const item = e.target.closest('.files-bc-link');
         if (!item) return;
         const idx = +item.dataset.bcIdx;
         filesPathStack = filesPathStack.slice(0, idx + 1);
-        loadFilesFolder(filesPathStack[idx].path);
+        loadFilesFolder(filesPathStack[idx].id);
     }, { once: true });
 }
 
-// ── Open file ─────────────────────────────────
-async function openDropboxFile(path, name) {
-    const grid = document.getElementById('filesGrid');
-    const showErr = msg => {
-        if (!grid) return;
-        const t = document.createElement('div');
-        t.className = 'files-error-toast';
-        t.textContent = `Could not open "${name}": ${msg}`;
-        grid.prepend(t);
-        setTimeout(() => t.remove(), 5000);
-    };
-    try {
-        const link = await dropboxTempLink(path);
-        window.open(link, '_blank', 'noopener');
-    } catch (err) { showErr(err.message); }
+// ── Open / Download ────────────────────────────
+
+function openDriveFile(fileId, name, mimeType) {
+    const isGoogleDoc = mimeType && mimeType.startsWith('application/vnd.google-apps.');
+    const url = isGoogleDoc
+        ? `https://drive.google.com/file/d/${fileId}/edit`
+        : `https://drive.google.com/file/d/${fileId}/view`;
+    window.open(url, '_blank', 'noopener');
 }
 
-// ── Download file ──────────────────────────────
-async function downloadDropboxFile(path, name, btn) {
-    const grid    = document.getElementById('filesGrid');
+async function downloadDriveFile(fileId, name, btn) {
     const origLabel = btn?.textContent;
-
-    const showErr = msg => {
+    const grid      = document.getElementById('filesGrid');
+    const showErr   = msg => {
         if (!grid) return;
         const t = document.createElement('div');
         t.className = 'files-error-toast';
@@ -2027,115 +1971,73 @@ async function downloadDropboxFile(path, name, btn) {
         grid.prepend(t);
         setTimeout(() => t.remove(), 6000);
     };
-
     try {
         if (btn) { btn.textContent = '…'; btn.disabled = true; }
-
-        const token = getDropboxToken();
-        if (!token) throw new Error('No Dropbox token — go to Settings to connect.');
-
-        const res = await fetch('https://content.dropboxapi.com/2/files/download', {
-            method:  'POST',
-            headers: {
-                'Authorization':   `Bearer ${token}`,
-                'Dropbox-API-Arg': JSON.stringify({ path }),
-            },
-        });
-
-        if (!res.ok) {
-            let msg = `Dropbox ${res.status}`;
-            try { const j = await res.json(); msg = j.error_summary || j.user_message || msg; } catch {}
-            throw new Error(msg);
-        }
-
+        const res = await driveReq(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
         const blob = await res.blob();
         const url  = URL.createObjectURL(blob);
         const a    = Object.assign(document.createElement('a'), { href: url, download: name });
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
         setTimeout(() => URL.revokeObjectURL(url), 60000);
-    } catch (err) {
-        showErr(err.message);
-    } finally {
-        if (btn) { btn.textContent = origLabel; btn.disabled = false; }
-    }
+    } catch (err) { showErr(err.message); }
+    finally { if (btn) { btn.textContent = origLabel; btn.disabled = false; } }
 }
 
-// ── Dropbox Upload ────────────────────────────
+// ── Upload ─────────────────────────────────────
 
-function uploadFileToDropbox(file, folderPath, onProgress) {
-    const token      = getDropboxToken();
-    const uploadPath = folderPath === '' ? `/${file.name}` : `${folderPath}/${file.name}`;
-
+function uploadFileToDrive(file, folderId, onProgress) {
+    const form = new FormData();
+    form.append('metadata', new Blob(
+        [JSON.stringify({ name: file.name, parents: [folderId] })],
+        { type: 'application/json' }
+    ));
+    form.append('file', file);
     return new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
-
         xhr.upload.addEventListener('progress', e => {
             if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
         });
-
         xhr.addEventListener('load', () => {
-            if (xhr.status === 200) {
-                resolve(JSON.parse(xhr.responseText));
-            } else {
-                let msg = `Upload failed (${xhr.status})`;
-                try { const j = JSON.parse(xhr.responseText); msg = j.error_summary || j.user_message || msg; } catch {}
-                reject(new Error(msg));
-            }
+            if (xhr.status >= 200 && xhr.status < 300) { resolve(JSON.parse(xhr.responseText)); }
+            else { reject(new Error(`Upload failed (${xhr.status})`)); }
         });
-
         xhr.addEventListener('error', () => reject(new Error('Network error during upload')));
         xhr.addEventListener('abort', () => reject(new Error('Upload cancelled')));
-
-        xhr.open('POST', 'https://content.dropboxapi.com/2/files/upload');
-        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-        xhr.setRequestHeader('Content-Type', 'application/octet-stream');
-        xhr.setRequestHeader('Dropbox-API-Arg', JSON.stringify({
-            path:       uploadPath,
-            mode:       'add',
-            autorename: true,
-            mute:       false,
-        }));
-
-        xhr.send(file);
+        xhr.open('POST', 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,size,mimeType');
+        xhr.setRequestHeader('Authorization', 'Bearer ' + getDriveToken());
+        xhr.send(form);
     });
 }
 
-async function handleDropboxUpload(files) {
-    if (!getDropboxToken()) return;
-    const fileArray = Array.from(files).filter(f => f.size >= 0);
+async function handleDriveUpload(files) {
+    if (!isDriveConnected()) return;
+    const fileArray  = Array.from(files).filter(f => f.size >= 0);
     if (!fileArray.length) return;
-
     const progressEl = document.getElementById('filesUploadProgress');
     if (!progressEl) return;
-
+    const folderId   = filesPathStack[filesPathStack.length - 1].id;
+    if (!folderId) return;
     const ts    = Date.now();
     const items = fileArray.map((file, i) => ({ file, uid: `up-${ts}-${i}` }));
-
     progressEl.innerHTML = `<div class="files-upload-block">
         ${items.map(item => `
         <div class="files-upload-item">
             <span class="files-upload-name" title="${esc(item.file.name)}">${esc(item.file.name)}</span>
-            <div class="files-upload-bar-wrap">
-                <div class="files-upload-bar" id="${item.uid}-bar" style="width:0%"></div>
-            </div>
+            <div class="files-upload-bar-wrap"><div class="files-upload-bar" id="${item.uid}-bar" style="width:0%"></div></div>
             <span class="files-upload-status" id="${item.uid}-status">0%</span>
         </div>`).join('')}
     </div>`;
-
-    const currentPath = filesPathStack[filesPathStack.length - 1].path;
     let anyFailed = false;
-
     await Promise.allSettled(items.map(async item => {
         const barEl    = document.getElementById(`${item.uid}-bar`);
         const statusEl = document.getElementById(`${item.uid}-status`);
         try {
-            await uploadFileToDropbox(item.file, currentPath, pct => {
+            await uploadFileToDrive(item.file, folderId, pct => {
                 if (barEl)    barEl.style.width   = `${pct}%`;
                 if (statusEl) statusEl.textContent = `${pct}%`;
             });
-            if (barEl)    barEl.style.width   = '100%';
+            if (barEl)    barEl.style.width = '100%';
             if (statusEl) { statusEl.textContent = 'Done'; statusEl.className = 'files-upload-status done'; }
         } catch (err) {
             anyFailed = true;
@@ -2146,15 +2048,13 @@ async function handleDropboxUpload(files) {
                 const t = document.createElement('div');
                 t.className   = 'files-error-toast';
                 t.textContent = `Failed to upload "${item.file.name}": ${err.message}`;
-                grid.prepend(t);
-                setTimeout(() => t.remove(), 6000);
+                grid.prepend(t); setTimeout(() => t.remove(), 6000);
             }
         }
     }));
-
     setTimeout(() => {
         if (progressEl) progressEl.innerHTML = '';
-        loadFilesFolder(filesPathStack[filesPathStack.length - 1].path);
+        loadFilesFolder(folderId);
     }, anyFailed ? 3500 : 1500);
 }
 
@@ -2162,7 +2062,6 @@ function bindFilesUpload() {
     const dropZone  = document.getElementById('filesDropZone');
     const fileInput = document.getElementById('filesUploadInput');
     if (!dropZone || !fileInput) return;
-
     dropZone.addEventListener('dragenter', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
     dropZone.addEventListener('dragover',  e => { e.preventDefault(); dropZone.classList.add('dragover'); });
     dropZone.addEventListener('dragleave', e => {
@@ -2172,11 +2071,10 @@ function bindFilesUpload() {
         e.preventDefault();
         dropZone.classList.remove('dragover');
         const files = e.dataTransfer?.files;
-        if (files?.length) handleDropboxUpload(files);
+        if (files?.length) handleDriveUpload(files);
     });
-
     fileInput.addEventListener('change', e => {
-        if (e.target.files?.length) handleDropboxUpload(e.target.files);
+        if (e.target.files?.length) handleDriveUpload(e.target.files);
         e.target.value = '';
     });
 }
@@ -2184,17 +2082,6 @@ function bindFilesUpload() {
 // ── Settings ──────────────────────────────────
 
 function renderSettingsSection() {
-    // Dropbox
-    const input = document.getElementById('dropboxTokenInput');
-    const dot   = document.getElementById('dropboxDot');
-    const token = getDropboxToken();
-    if (input) {
-        input.value       = '';
-        input.placeholder = token ? 'Token saved — paste new token to replace' : 'Paste your Dropbox access token';
-    }
-    if (dot) dot.className = `settings-status-dot${token ? ' connected' : ''}`;
-    setDropboxStatus(token ? 'saved' : '', token ? 'Token saved' : '');
-
     // Anthropic
     const aInput = document.getElementById('anthropicKeyInput');
     const aDot   = document.getElementById('claudeDot');
@@ -2224,44 +2111,6 @@ function renderSettingsSection() {
     startClawdLoopIfNeeded();
 }
 
-function setDropboxStatus(cls, msg) {
-    const el  = document.getElementById('dropboxStatusMsg');
-    const dot = document.getElementById('dropboxDot');
-    if (el)  { el.className = `settings-status${cls ? ' settings-status-' + cls : ''}`; el.textContent = msg; }
-    if (dot) { dot.className = `settings-status-dot${cls === 'success' || cls === 'saved' ? ' connected' : cls === 'error' ? ' error' : ''}`; }
-}
-
-async function saveDropboxToken() {
-    const input = document.getElementById('dropboxTokenInput');
-    const raw   = input?.value?.trim();
-    if (!raw) { setDropboxStatus('error', 'Paste a token above first.'); return; }
-    localStorage.setItem('cbu_dropboxToken', raw);
-    if (input) { input.value = ''; input.placeholder = 'Token saved — paste new token to replace'; }
-    setDropboxStatus('saved', 'Token saved. Testing connection…');
-    await testDropboxConnection();
-}
-
-async function testDropboxConnection() {
-    setDropboxStatus('loading', 'Connecting to Dropbox…');
-    try {
-        const token = getDropboxToken();
-        if (!token) throw new Error('No token saved.');
-        const res = await fetch('https://api.dropboxapi.com/2/users/get_current_account', {
-            method:  'POST',
-            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-            body:    'null',
-        });
-        if (!res.ok) {
-            const j = await res.json().catch(() => ({}));
-            throw new Error(j.error_summary || `Status ${res.status}`);
-        }
-        const user = await res.json();
-        const name = user.name?.display_name || user.email || 'your account';
-        setDropboxStatus('success', `Connected as ${name}`);
-    } catch (err) {
-        setDropboxStatus('error', err.message);
-    }
-}
 
 // ── Claude Assistant ──────────────────────────
 
@@ -2705,14 +2554,7 @@ function bindEvents() {
 
     // Files
     document.getElementById('filesRefreshBtn')?.addEventListener('click', () => {
-        loadFilesFolder(filesPathStack[filesPathStack.length - 1].path);
-    });
-
-    // Settings — Dropbox
-    document.getElementById('saveDropboxTokenBtn')?.addEventListener('click', saveDropboxToken);
-    document.getElementById('testDropboxBtn')?.addEventListener('click', testDropboxConnection);
-    document.getElementById('dropboxTokenInput')?.addEventListener('keydown', e => {
-        if (e.key === 'Enter') saveDropboxToken();
+        loadFilesFolder(filesPathStack[filesPathStack.length - 1].id);
     });
 
     // Settings — Anthropic
