@@ -1,3 +1,3 @@
 const CONFIG = {
-    GOOGLE_CLIENT_ID: '253933945027-ls9otjgca76pjockrgp52gkivuqvdjgd.apps.googleusercontent.com',
+    GOOGLE_CLIENT_ID: '253933945027-oebls9seq7fk2t4eeb8fnoad6veuquao.apps.googleusercontent.com',
 };
