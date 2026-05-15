@@ -1459,44 +1459,16 @@ function renderNotes() {
 
 // ── Thesis ────────────────────────────────────
 
-// IndexedDB helpers for PDF binary storage
-let _pdfDB = null;
+// ── Thesis PDFs ───────────────────────────────
 
-function openPdfDB() {
-    return new Promise((resolve, reject) => {
-        if (_pdfDB) { resolve(_pdfDB); return; }
-        const req = indexedDB.open('cbu_thesis', 1);
-        req.onupgradeneeded = e => e.target.result.createObjectStore('pdfs', { keyPath: 'id' });
-        req.onsuccess = e => { _pdfDB = e.target.result; resolve(_pdfDB); };
-        req.onerror   = () => reject(req.error);
-    });
-}
+let _thesisPdfFolderId = null;
 
-function idbPut(record) {
-    return openPdfDB().then(db => new Promise((resolve, reject) => {
-        const tx = db.transaction('pdfs', 'readwrite');
-        tx.objectStore('pdfs').put(record);
-        tx.oncomplete = resolve;
-        tx.onerror    = () => reject(tx.error);
-    }));
-}
-
-function idbGet(id) {
-    return openPdfDB().then(db => new Promise((resolve, reject) => {
-        const tx  = db.transaction('pdfs', 'readonly');
-        const req = tx.objectStore('pdfs').get(id);
-        req.onsuccess = () => resolve(req.result || null);
-        req.onerror   = () => reject(req.error);
-    }));
-}
-
-function idbDelete(id) {
-    return openPdfDB().then(db => new Promise((resolve, reject) => {
-        const tx = db.transaction('pdfs', 'readwrite');
-        tx.objectStore('pdfs').delete(id);
-        tx.oncomplete = resolve;
-        tx.onerror    = () => reject(tx.error);
-    }));
+async function getThesisPdfFolder() {
+    if (_thesisPdfFolderId) return _thesisPdfFolderId;
+    const cbuId    = await getCBUFolder();
+    const thesisId = await getOrCreateSubfolder(cbuId, 'Thesis');
+    _thesisPdfFolderId = await getOrCreateSubfolder(thesisId, 'PDFs');
+    return _thesisPdfFolderId;
 }
 
 // Thesis sub-tab switcher
@@ -1609,69 +1581,69 @@ function renderThesisLinks() {
     ).join('');
 }
 
-// Thesis PDFs
 function fmtFileSize(bytes) {
     if (bytes < 1024)    return `${bytes} B`;
     if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / 1048576).toFixed(1)} MB`;
 }
 
-async function handlePdfUpload(file) {
-    if (!file || file.type !== 'application/pdf') {
-        alert('Please select a PDF file.');
-        return;
-    }
-    const id   = Date.now();
-    const meta = { id, name: file.name, size: file.size, addedAt: new Date().toISOString() };
+async function handleThesisPdfUpload(files) {
+    if (!isDriveConnected()) return;
+    const fileArray = Array.from(files).filter(f => f.type === 'application/pdf' && f.size > 0);
+    if (!fileArray.length) return;
+    const progressEl = document.getElementById('thesisPdfProgress');
+    if (!progressEl) return;
+    const ts    = Date.now();
+    const items = fileArray.map((file, i) => ({ file, uid: `pdf-${ts}-${i}`, id: ts + i }));
+    progressEl.innerHTML = `<div class="files-upload-block" style="margin-bottom:12px">
+        ${items.map(item => `
+        <div class="files-upload-item">
+            <span class="files-upload-name" title="${esc(item.file.name)}">${esc(item.file.name)}</span>
+            <div class="files-upload-bar-wrap"><div class="files-upload-bar" id="${item.uid}-bar" style="width:0%"></div></div>
+            <span class="files-upload-status" id="${item.uid}-status">0%</span>
+        </div>`).join('')}
+    </div>`;
     try {
-        const buf = await file.arrayBuffer();
-        await idbPut({ id, data: buf });
-        state.thesis.pdfs.unshift(meta);
-        save('thesis_pdfs', state.thesis.pdfs);
-        renderThesisPdfs();
-    } catch (err) {
-        alert(`Failed to store PDF: ${err.message}`);
-    }
+        const folderId = await getThesisPdfFolder();
+        await Promise.allSettled(items.map(async item => {
+            const barEl    = document.getElementById(`${item.uid}-bar`);
+            const statusEl = document.getElementById(`${item.uid}-status`);
+            try {
+                const result = await uploadFileToDrive(item.file, folderId, pct => {
+                    if (barEl)    barEl.style.width   = `${pct}%`;
+                    if (statusEl) statusEl.textContent = `${pct}%`;
+                });
+                if (barEl)    barEl.style.width = '100%';
+                if (statusEl) { statusEl.textContent = 'Done'; statusEl.className = 'files-upload-status done'; }
+                state.thesis.pdfs.unshift({ id: item.id, name: item.file.name, size: item.file.size, driveId: result.id, addedAt: new Date().toISOString() });
+                save('thesis_pdfs', state.thesis.pdfs);
+                renderThesisPdfs();
+            } catch {
+                if (barEl)    { barEl.style.background = 'var(--red)'; barEl.style.width = '100%'; }
+                if (statusEl) { statusEl.textContent = 'Failed'; statusEl.className = 'files-upload-status error'; }
+            }
+        }));
+    } catch (err) { console.warn('[Drive] PDF upload failed:', err.message); }
+    setTimeout(() => { if (progressEl) progressEl.innerHTML = ''; }, 2500);
 }
 
-async function openThesisPdf(id) {
-    try {
-        const rec = await idbGet(id);
-        if (!rec) { alert('PDF data not found — it may have been cleared from IndexedDB.'); return; }
-        const url = URL.createObjectURL(new Blob([rec.data], { type: 'application/pdf' }));
-        window.open(url, '_blank', 'noopener');
-    } catch (err) {
-        alert(`Could not open PDF: ${err.message}`);
-    }
-}
-
-async function downloadThesisPdf(id) {
+function openThesisPdf(id) {
     const meta = state.thesis.pdfs.find(p => p.id === id);
-    if (!meta) return;
-    try {
-        const rec = await idbGet(id);
-        if (!rec) { alert('PDF data not found.'); return; }
-        const url = URL.createObjectURL(new Blob([rec.data], { type: 'application/pdf' }));
-        const a   = Object.assign(document.createElement('a'), { href: url, download: meta.name });
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        setTimeout(() => URL.revokeObjectURL(url), 60000);
-    } catch (err) {
-        alert(`Download failed: ${err.message}`);
-    }
+    if (meta?.driveId) window.open(`https://drive.google.com/file/d/${meta.driveId}/view`, '_blank', 'noopener');
+}
+
+function downloadThesisPdf(id) {
+    const meta = state.thesis.pdfs.find(p => p.id === id);
+    if (meta?.driveId) downloadDriveFile(meta.driveId, meta.name, null);
 }
 
 async function deleteThesisPdf(id) {
     if (!confirm('Remove this PDF from the library?')) return;
-    try {
-        await idbDelete(id);
-        state.thesis.pdfs = state.thesis.pdfs.filter(p => p.id !== id);
-        save('thesis_pdfs', state.thesis.pdfs);
-        renderThesisPdfs();
-    } catch (err) {
-        alert(`Delete failed: ${err.message}`);
-    }
+    const meta = state.thesis.pdfs.find(p => p.id === id);
+    state.thesis.pdfs = state.thesis.pdfs.filter(p => p.id !== id);
+    save('thesis_pdfs', state.thesis.pdfs);
+    renderThesisPdfs();
+    if (meta?.driveId) driveReq(`https://www.googleapis.com/drive/v3/files/${meta.driveId}`, { method: 'DELETE' }).catch(() => {});
 }
 
 function renderThesisPdfs() {
@@ -1680,7 +1652,7 @@ function renderThesisPdfs() {
     if (!state.thesis.pdfs.length) {
         el.innerHTML = `<div class="empty-state">
             <div class="empty-state-icon"></div>
-            <div class="empty-state-text">No PDFs yet. Click "+ Upload PDF" to add one.</div>
+            <div class="empty-state-text">No PDFs yet. Drop a file above or click "+ Upload PDF".</div>
         </div>`;
         return;
     }
@@ -1689,7 +1661,7 @@ function renderThesisPdfs() {
             <span class="pdf-icon"></span>
             <div class="pdf-info">
                 <div class="pdf-name">${esc(p.name)}</div>
-                <div class="pdf-meta">${fmtFileSize(p.size)} · Added ${fmtNoteDate(p.addedAt)}</div>
+                <div class="pdf-meta">${p.size ? fmtFileSize(p.size) + ' · ' : ''}Added ${fmtNoteDate(p.addedAt)}</div>
             </div>
             <div class="pdf-actions">
                 <button class="btn btn-ghost" style="font-size:12px;padding:5px 10px"
@@ -1700,6 +1672,26 @@ function renderThesisPdfs() {
             </div>
         </div>`
     ).join('');
+}
+
+function bindThesisPdfUpload() {
+    const drop  = document.getElementById('thesisPdfDrop');
+    const input = document.getElementById('pdfUploadInput');
+    if (!drop || !input) return;
+    drop.addEventListener('dragenter', e => { e.preventDefault(); drop.classList.add('dragover'); });
+    drop.addEventListener('dragover',  e => { e.preventDefault(); drop.classList.add('dragover'); });
+    drop.addEventListener('dragleave', e => {
+        if (!drop.contains(e.relatedTarget)) drop.classList.remove('dragover');
+    });
+    drop.addEventListener('drop', e => {
+        e.preventDefault();
+        drop.classList.remove('dragover');
+        if (e.dataTransfer?.files?.length) handleThesisPdfUpload(e.dataTransfer.files);
+    });
+    input.addEventListener('change', e => {
+        if (e.target.files?.length) handleThesisPdfUpload(e.target.files);
+        e.target.value = '';
+    });
 }
 
 // ── Calendar ──────────────────────────────────
@@ -2738,11 +2730,7 @@ function bindEvents() {
     });
 
     // Thesis PDFs
-    document.getElementById('pdfUploadInput')?.addEventListener('change', e => {
-        const file = e.target.files[0];
-        if (file) handlePdfUpload(file);
-        e.target.value = '';  // reset so the same file can be re-uploaded
-    });
+    bindThesisPdfUpload();
 
     // Files
     document.getElementById('filesRefreshBtn')?.addEventListener('click', () => {

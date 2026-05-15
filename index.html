@@ -271,11 +271,17 @@
                 <div id="thesis-pdfs" class="thesis-panel" role="tabpanel">
                     <div class="section-header">
                         <h2>PDF Library</h2>
-                        <label class="btn btn-primary" for="pdfUploadInput" style="cursor:pointer">+ Upload PDF</label>
-                        <input type="file" id="pdfUploadInput" accept=".pdf" style="display:none" aria-label="Upload PDF file">
                     </div>
+                    <div class="files-upload-area">
+                        <div class="files-drop-zone" id="thesisPdfDrop">
+                            <span class="files-drop-icon"></span>
+                            <span>Drop PDFs here to upload</span>
+                        </div>
+                        <label class="btn btn-ghost" for="pdfUploadInput" style="cursor:pointer">+ Upload PDF</label>
+                        <input type="file" id="pdfUploadInput" accept=".pdf" multiple style="display:none" aria-label="Upload PDF files">
+                    </div>
+                    <div id="thesisPdfProgress"></div>
                     <div id="thesisPdfsList"></div>
-                    <p class="form-hint" style="margin-top:16px">PDFs are stored in your browser's IndexedDB and persist between sessions on this device.</p>
                 </div>
             </section>
 
