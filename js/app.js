@@ -12,6 +12,7 @@ const state = {
     thesis: { notes: [], links: [], pdfs: [] },
     calendarEvents: [],
     customEvents: [],   // shared store — synced between Schedule and Calendar tabs
+    sketches: [],
 };
 
 // ── Persistence ───────────────────────────────
@@ -234,6 +235,9 @@ function init() {
         links: load('thesis_links', []),
         pdfs:  load('thesis_pdfs',  []),
     };
+    state.sketches = (load('sketches', []) || []).sort((a, b) =>
+        new Date(b.addedAt) - new Date(a.addedAt)
+    );
 
     _todosViewDate = todayDateStr();
 
@@ -249,6 +253,7 @@ function init() {
     renderThesisLinks();
     renderThesisPdfs();
     renderCalendar();
+    renderSketchLog();
     bindEvents();
 }
 
@@ -382,6 +387,7 @@ const SECTION_TITLES = {
     assignments: 'Assignments',
     todos:       'To-Do List',
     studio:      'Studio Projects',
+    sketchlog:   'Sketch Log',
     schedule:    'Weekly Schedule',
     notes:       'Notes',
     thesis:      'Thesis',
@@ -403,8 +409,9 @@ function showSection(id) {
     const titleEl = document.getElementById('pageTitle');
     if (titleEl) titleEl.textContent = SECTION_TITLES[id] || '';
 
-    if (id === 'files')    renderFiles();
-    if (id === 'settings') renderSettingsSection();
+    if (id === 'files')      renderFiles();
+    if (id === 'settings')   renderSettingsSection();
+    if (id === 'sketchlog')  renderSketchLog();
     if (id === 'claude') {
         document.getElementById('claudeModeSelect').style.display  = '';
         document.getElementById('claudeInlineChat').style.display  = 'none';
@@ -2263,6 +2270,265 @@ function bindFilesUpload() {
     });
 }
 
+// ── Sketch Log ────────────────────────────────
+
+let _sketchFolderId   = null;
+let _pendingSketchFile = null;
+let _expandedSketchId  = null;
+const _sketchThumbs   = {};   // driveId → URL (in-memory cache per session)
+
+async function getSketchFolder() {
+    if (_sketchFolderId) return _sketchFolderId;
+    const cbuId = await getCBUFolder();
+    _sketchFolderId = await getOrCreateSubfolder(cbuId, 'Sketches');
+    return _sketchFolderId;
+}
+
+function handleSketchFiles(files) {
+    const imgs = Array.from(files).filter(f =>
+        f.type === 'image/jpeg' || f.type === 'image/jpg' || f.type === 'image/png'
+    );
+    if (imgs.length) openSketchUploadModal(imgs[0]);
+}
+
+function openSketchUploadModal(file) {
+    if (!file) return;
+    _pendingSketchFile = file;
+
+    const filenameEl = document.getElementById('sketchModalFilename');
+    const previewImg = document.getElementById('sketchPreviewImg');
+    const loadingEl  = document.getElementById('sketchPreviewLoading');
+    const dateInput  = document.getElementById('sketchDateInput');
+    const descInput  = document.getElementById('sketchDescInput');
+
+    if (filenameEl) filenameEl.textContent = file.name;
+    if (dateInput)  dateInput.value = new Date().toISOString().slice(0, 10);
+    if (descInput)  descInput.value = '';
+    if (loadingEl)  loadingEl.style.display = '';
+    if (previewImg) { previewImg.style.display = 'none'; previewImg.src = ''; }
+
+    const reader = new FileReader();
+    reader.onload = e => {
+        if (previewImg) { previewImg.src = e.target.result; previewImg.style.display = ''; }
+        if (loadingEl)  loadingEl.style.display = 'none';
+    };
+    reader.readAsDataURL(file);
+    openModal('sketchUploadModal');
+}
+
+function cancelSketchUpload() {
+    _pendingSketchFile = null;
+    closeModal('sketchUploadModal');
+}
+
+async function saveSketch() {
+    if (!_pendingSketchFile) return;
+    if (!isDriveConnected()) { showClaudeToast('Connect Google Drive first.'); return; }
+
+    const btn     = document.getElementById('saveSketchBtn');
+    const dateVal = document.getElementById('sketchDateInput')?.value.trim();
+    const desc    = document.getElementById('sketchDescInput')?.value.trim();
+
+    if (btn) { btn.disabled = true; btn.textContent = 'Uploading…'; }
+
+    try {
+        const folderId = await getSketchFolder();
+        const file     = _pendingSketchFile;
+        const result   = await uploadFileToDrive(file, folderId, () => {});
+
+        // Cache data URL so thumbnail shows immediately without waiting for Drive to generate one
+        const localReader = new FileReader();
+        localReader.onload = e => { _sketchThumbs[result.id] = e.target.result; };
+        localReader.readAsDataURL(file);
+
+        const sketch = {
+            id:      Date.now(),
+            name:    file.name,
+            driveId: result.id,
+            date:    dateVal || new Date().toISOString().slice(0, 10),
+            desc:    desc || '',
+            addedAt: new Date().toISOString(),
+            size:    file.size,
+        };
+
+        state.sketches.unshift(sketch);
+        save('sketches', state.sketches);
+        _pendingSketchFile = null;
+        closeModal('sketchUploadModal');
+        renderSketchLog();
+    } catch (err) {
+        console.warn('[Drive] Sketch upload failed:', err.message);
+        showClaudeToast('Upload failed: ' + err.message);
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = 'Save to Drive'; }
+    }
+}
+
+function renderSketchLog() {
+    const grid = document.getElementById('sketchGrid');
+    if (!grid) return;
+
+    if (!state.sketches.length) {
+        grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1">
+            <div class="empty-state-icon"></div>
+            <div class="empty-state-text">No sketches yet. Drop an image above or click "+ Upload Sketch".</div>
+        </div>`;
+        return;
+    }
+
+    grid.innerHTML = state.sketches.map((s, i) => {
+        const dateLabel = s.date
+            ? new Date(s.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+            : '';
+        return `
+        <div class="sketch-card" data-id="${s.id}" style="animation-delay:${i * 60}ms" onclick="openSketchExpanded(${s.id})">
+            <div class="sketch-card-meta-row">
+                <span class="sketch-card-date">${esc(dateLabel)}</span>
+            </div>
+            <div class="sketch-card-desc">${esc(s.desc)}</div>
+            <div class="sketch-card-thumb-wrap">
+                <img class="sketch-card-thumb" data-drive-id="${esc(s.driveId)}"
+                     alt="${esc(s.name)}" src="" style="opacity:0">
+            </div>
+        </div>`;
+    }).join('');
+
+    grid.querySelectorAll('.sketch-card-thumb').forEach(img => loadSketchThumbnail(img));
+}
+
+async function loadSketchThumbnail(img) {
+    const driveId = img.dataset.driveId;
+    if (!driveId) return;
+    if (_sketchThumbs[driveId]) {
+        img.src = _sketchThumbs[driveId];
+        img.style.opacity = '1';
+        return;
+    }
+    if (!isDriveConnected()) return;
+    try {
+        const res = await driveReq(`https://www.googleapis.com/drive/v3/files/${driveId}?fields=thumbnailLink`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.thumbnailLink) {
+            const url = data.thumbnailLink.replace(/=s\d+/, '=s400');
+            _sketchThumbs[driveId] = url;
+            img.src = url;
+            img.style.opacity = '1';
+        }
+    } catch {}
+}
+
+async function openSketchExpanded(id) {
+    const sketch = state.sketches.find(s => s.id === id);
+    if (!sketch) return;
+    _expandedSketchId = id;
+
+    const dateEl   = document.getElementById('sketchExpandedDate');
+    const descEl   = document.getElementById('sketchExpandedDesc');
+    const imgEl    = document.getElementById('sketchExpandedImg');
+    const metaView = document.getElementById('sketchExpandedMetaView');
+    const metaEdit = document.getElementById('sketchExpandedMetaEdit');
+    const editBtn  = document.getElementById('editSketchBtn');
+
+    if (metaView) metaView.style.display = '';
+    if (metaEdit) metaEdit.style.display = 'none';
+    if (editBtn)  editBtn.style.display  = '';
+
+    const dateLabel = sketch.date
+        ? new Date(sketch.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+        : 'No date';
+
+    if (dateEl) dateEl.textContent = dateLabel;
+    if (descEl) descEl.textContent = sketch.desc;
+    if (imgEl)  imgEl.src = _sketchThumbs[sketch.driveId] || '';
+
+    openModal('sketchExpandedModal');
+
+    if (sketch.driveId && isDriveConnected() && imgEl) {
+        try {
+            const res = await driveReq(`https://www.googleapis.com/drive/v3/files/${sketch.driveId}?alt=media`);
+            if (!res.ok) return;
+            const blob   = await res.blob();
+            const prevUrl = imgEl.src;
+            imgEl.src    = URL.createObjectURL(blob);
+            if (prevUrl.startsWith('blob:')) URL.revokeObjectURL(prevUrl);
+        } catch {}
+    }
+}
+
+function openSketchEditMode() {
+    const sketch = state.sketches.find(s => s.id === _expandedSketchId);
+    if (!sketch) return;
+    document.getElementById('sketchEditDate').value = sketch.date || '';
+    document.getElementById('sketchEditDesc').value = sketch.desc || '';
+    document.getElementById('sketchExpandedMetaView').style.display = 'none';
+    document.getElementById('sketchExpandedMetaEdit').style.display = '';
+    document.getElementById('editSketchBtn').style.display = 'none';
+}
+
+function cancelSketchEdit() {
+    document.getElementById('sketchExpandedMetaView').style.display = '';
+    document.getElementById('sketchExpandedMetaEdit').style.display = 'none';
+    document.getElementById('editSketchBtn').style.display = '';
+}
+
+function saveSketchEdit() {
+    const sketch = state.sketches.find(s => s.id === _expandedSketchId);
+    if (!sketch) return;
+
+    sketch.date = document.getElementById('sketchEditDate').value;
+    sketch.desc = document.getElementById('sketchEditDesc').value.trim();
+    save('sketches', state.sketches);
+
+    const dateLabel = sketch.date
+        ? new Date(sketch.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+        : 'No date';
+    document.getElementById('sketchExpandedDate').textContent = dateLabel;
+    document.getElementById('sketchExpandedDesc').textContent = sketch.desc;
+
+    cancelSketchEdit();
+    renderSketchLog();
+}
+
+function downloadCurrentSketch() {
+    const sketch = state.sketches.find(s => s.id === _expandedSketchId);
+    if (sketch?.driveId) downloadDriveFile(sketch.driveId, sketch.name, null);
+}
+
+function bindSketchLog() {
+    const dropZone = document.getElementById('sketchDropZone');
+    const input    = document.getElementById('sketchUploadInput');
+
+    if (dropZone) {
+        dropZone.addEventListener('dragenter', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+        dropZone.addEventListener('dragover',  e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+        dropZone.addEventListener('dragleave', e => {
+            if (!dropZone.contains(e.relatedTarget)) dropZone.classList.remove('dragover');
+        });
+        dropZone.addEventListener('drop', e => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            if (e.dataTransfer?.files?.length) handleSketchFiles(e.dataTransfer.files);
+        });
+        dropZone.addEventListener('click', () => input?.click());
+    }
+
+    if (input) {
+        input.addEventListener('change', e => {
+            if (e.target.files?.length) handleSketchFiles(e.target.files);
+            e.target.value = '';
+        });
+    }
+
+    document.getElementById('saveSketchBtn')?.addEventListener('click', saveSketch);
+    document.getElementById('cancelSketchBtn')?.addEventListener('click', cancelSketchUpload);
+    document.getElementById('editSketchBtn')?.addEventListener('click', openSketchEditMode);
+    document.getElementById('downloadSketchBtn')?.addEventListener('click', downloadCurrentSketch);
+    document.getElementById('closeSketchExpandedBtn')?.addEventListener('click', () => closeModal('sketchExpandedModal'));
+    document.getElementById('saveSketchEditBtn')?.addEventListener('click', saveSketchEdit);
+    document.getElementById('cancelSketchEditBtn')?.addEventListener('click', cancelSketchEdit);
+}
+
 // ── Settings ──────────────────────────────────
 
 function renderSettingsSection() {
@@ -2798,7 +3064,8 @@ function bindEvents() {
     });
 
     // Close modals on backdrop click
-    ['canvasModal', 'scheduleModal', 'schedCustomEventModal', 'thesisLinkModal', 'calEventModal'].forEach(id => {
+    ['canvasModal', 'scheduleModal', 'schedCustomEventModal', 'thesisLinkModal', 'calEventModal',
+     'sketchUploadModal', 'sketchExpandedModal'].forEach(id => {
         document.getElementById(id)?.addEventListener('click', e => {
             if (e.target === document.getElementById(id)) closeModal(id);
         });
@@ -2807,7 +3074,8 @@ function bindEvents() {
     // Close modals on Escape key
     document.addEventListener('keydown', e => {
         if (e.key === 'Escape') {
-            ['canvasModal', 'scheduleModal', 'schedCustomEventModal', 'thesisLinkModal', 'calEventModal'].forEach(id => {
+            ['canvasModal', 'scheduleModal', 'schedCustomEventModal', 'thesisLinkModal', 'calEventModal',
+             'sketchUploadModal', 'sketchExpandedModal'].forEach(id => {
                 if (document.getElementById(id)?.classList.contains('open')) closeModal(id);
             });
             if (document.getElementById('apiWarningModal')?.classList.contains('open')) resolveApiWarning(false);
@@ -2816,6 +3084,9 @@ function bindEvents() {
 
     // Files drag-and-drop upload
     bindFilesUpload();
+
+    // Sketch Log
+    bindSketchLog();
 }
 
 function closeSidebar() {

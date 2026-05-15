@@ -50,6 +50,11 @@
                 </a>
             </li>
             <li>
+                <a href="#sketchlog" class="nav-link" data-section="sketchlog">
+                    <span class="nav-icon"></span> Sketch Log
+                </a>
+            </li>
+            <li>
                 <a href="#schedule" class="nav-link" data-section="schedule">
                     <span class="nav-icon"></span> Weekly Schedule
                 </a>
@@ -193,6 +198,22 @@
                         <div id="studioDeliverablesList"></div>
                     </div>
                 </div>
+            </section>
+
+            <!-- Sketch Log -->
+            <section id="sketchlog" class="section">
+                <div class="sketch-upload-area">
+                    <div class="sketch-drop-zone" id="sketchDropZone">
+                        <div class="sketch-drop-inner">
+                            <div class="sketch-drop-icon">+</div>
+                            <div class="sketch-drop-label">Drop sketches here to upload</div>
+                            <div class="sketch-drop-sub">JPEG · PNG</div>
+                        </div>
+                    </div>
+                    <label class="btn btn-ghost" for="sketchUploadInput" style="cursor:pointer;white-space:nowrap">+ Upload Sketch</label>
+                    <input type="file" id="sketchUploadInput" accept="image/jpeg,image/jpg,image/png" multiple style="display:none" aria-label="Upload sketch images">
+                </div>
+                <div class="sketch-grid" id="sketchGrid"></div>
             </section>
 
             <!-- Weekly Schedule -->
@@ -636,6 +657,75 @@
             <div class="modal-footer">
                 <button class="btn btn-ghost" id="cancelSchedCustomModal">Cancel</button>
                 <button class="btn btn-primary" id="saveSchedCustomEvent">Add Event</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sketch Upload Modal -->
+    <div class="modal-overlay" id="sketchUploadModal" role="dialog" aria-modal="true" aria-labelledby="sketchUploadModalTitle">
+        <div class="modal sketch-upload-modal">
+            <div class="sketch-upload-modal-body">
+                <div class="sketch-preview-pane">
+                    <div class="sketch-preview-loading" id="sketchPreviewLoading">
+                        <div class="pencil-loader-wrap">
+                            <div class="pencil-loader">
+                                <div class="pencil-eraser"></div>
+                                <div class="pencil-band"></div>
+                                <div class="pencil-stripe"></div>
+                                <div class="pencil-body"></div>
+                                <div class="pencil-tipcap"></div>
+                                <div class="pencil-tip"></div>
+                            </div>
+                        </div>
+                        <div class="pencil-loader-text">loading preview...</div>
+                    </div>
+                    <img class="sketch-preview-img" id="sketchPreviewImg" alt="" style="display:none">
+                </div>
+                <div class="sketch-form-pane">
+                    <div class="sketch-modal-filename" id="sketchModalFilename"></div>
+                    <div class="form-group">
+                        <label for="sketchDateInput">Completion Date</label>
+                        <input type="date" id="sketchDateInput" class="input-field">
+                    </div>
+                    <div class="form-group" style="flex:1;display:flex;flex-direction:column">
+                        <label for="sketchDescInput">Description</label>
+                        <textarea id="sketchDescInput" class="input-field textarea" placeholder="Describe this sketch…" rows="4" style="flex:1;min-height:80px"></textarea>
+                    </div>
+                    <div class="sketch-modal-actions">
+                        <button class="btn btn-primary" id="saveSketchBtn">Save to Drive</button>
+                        <button class="btn btn-ghost" id="cancelSketchBtn">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sketch Expanded View Modal -->
+    <div class="modal-overlay" id="sketchExpandedModal" role="dialog" aria-modal="true">
+        <div class="modal sketch-expanded-modal">
+            <div class="sketch-expanded-topbar">
+                <div class="sketch-expanded-info">
+                    <div id="sketchExpandedMetaView">
+                        <div class="sketch-expanded-date" id="sketchExpandedDate"></div>
+                        <div class="sketch-expanded-desc" id="sketchExpandedDesc"></div>
+                    </div>
+                    <div id="sketchExpandedMetaEdit" style="display:none">
+                        <input type="date" id="sketchEditDate" class="input-field" style="margin-bottom:8px;max-width:200px">
+                        <textarea id="sketchEditDesc" class="input-field textarea" rows="2" placeholder="Description…" style="min-height:52px"></textarea>
+                        <div style="display:flex;gap:8px;margin-top:8px">
+                            <button class="btn btn-primary" id="saveSketchEditBtn" style="font-size:12px;padding:5px 10px">Save</button>
+                            <button class="btn btn-ghost" id="cancelSketchEditBtn" style="font-size:12px;padding:5px 10px">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="sketch-expanded-actions">
+                    <button class="btn btn-ghost" id="editSketchBtn" style="font-size:12px;padding:5px 10px">Edit</button>
+                    <button class="btn btn-ghost" id="downloadSketchBtn" style="font-size:12px;padding:5px 10px">↓ Download</button>
+                    <button class="modal-close" id="closeSketchExpandedBtn" aria-label="Close">✕</button>
+                </div>
+            </div>
+            <div class="sketch-expanded-img-wrap">
+                <img class="sketch-expanded-img" id="sketchExpandedImg" alt="">
             </div>
         </div>
     </div>

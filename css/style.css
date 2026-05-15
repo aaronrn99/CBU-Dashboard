@@ -2658,3 +2658,374 @@ body {
     .pin-title   { margin-bottom: 16px; }
     .pin-dots    { margin-bottom: 8px; }
 }
+
+/* ── Sketch Log ─────────────────────────────────── */
+
+.sketch-upload-area {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 24px;
+}
+
+.sketch-drop-zone {
+    flex: 1;
+    border: 2px dashed #c8b89a;
+    border-radius: var(--radius);
+    padding: 22px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    user-select: none;
+    transition: border-color var(--ease), background var(--ease);
+}
+
+.sketch-drop-zone.dragover {
+    background: rgba(200, 184, 154, 0.08);
+    border-color: #e0d2b8;
+}
+
+.sketch-drop-inner { text-align: center; }
+
+.sketch-drop-icon {
+    font-size: 22px;
+    color: #c8b89a;
+    margin-bottom: 6px;
+    line-height: 1;
+}
+
+.sketch-drop-label {
+    font-size: 14px;
+    color: #c8b89a;
+    font-weight: 500;
+    margin-bottom: 4px;
+}
+
+.sketch-drop-sub {
+    font-size: 11px;
+    color: rgba(200, 184, 154, 0.6);
+    font-family: 'SFMono-Regular', 'Consolas', 'Liberation Mono', monospace;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+/* ── Sketch Grid ─────────────────────────────────── */
+
+.sketch-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    align-items: start;
+}
+
+/* ── Sketch Card ─────────────────────────────────── */
+
+@keyframes sketchCardIn {
+    from { opacity: 0; transform: translateX(40px); }
+    to   { opacity: 1; transform: translateX(0); }
+}
+
+.sketch-card {
+    background: var(--bg-2);
+    border: 1px solid #c8b89a;
+    border-radius: var(--radius);
+    overflow: hidden;
+    cursor: pointer;
+    animation: sketchCardIn 0.45s ease forwards;
+    opacity: 0;
+    transition: box-shadow 0.35s ease;
+}
+
+.sketch-card:hover {
+    box-shadow:
+        0 0 8px 2px rgba(200, 184, 154, 0.35),
+        0 0 16px 5px rgba(200, 184, 154, 0.17),
+        0 0 28px 8px rgba(200, 184, 154, 0.07);
+}
+
+.sketch-card-meta-row {
+    padding: 10px 12px 4px;
+}
+
+.sketch-card-date {
+    font-family: 'SFMono-Regular', 'Consolas', 'Liberation Mono', monospace;
+    font-size: 11px;
+    color: #3dba72;
+    display: block;
+    letter-spacing: 0.04em;
+}
+
+.sketch-card-desc {
+    padding: 0 12px 8px;
+    font-size: 12px;
+    color: var(--text-2);
+    line-height: 1.4;
+    min-height: 18px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.sketch-card-thumb-wrap {
+    width: 100%;
+    aspect-ratio: 4/3;
+    background: var(--bg-3);
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.sketch-card-thumb {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: opacity 0.3s ease;
+}
+
+/* ── Sketch Upload Modal ─────────────────────────── */
+
+@keyframes sketchModalGlow {
+    0%, 100% {
+        box-shadow:
+            0 0 5px 1px rgba(200, 184, 154, 0.12),
+            0 0 12px 4px rgba(200, 184, 154, 0.07),
+            0 0 20px 7px rgba(200, 184, 154, 0.04);
+    }
+    50% {
+        box-shadow:
+            0 0 12px 3px rgba(200, 184, 154, 0.34),
+            0 0 24px 8px rgba(200, 184, 154, 0.17),
+            0 0 37px 12px rgba(200, 184, 154, 0.07);
+    }
+}
+
+.sketch-upload-modal {
+    border: 1px solid #c8b89a;
+    max-width: 780px;
+    padding: 0;
+    animation: modalIn 0.16s ease, sketchModalGlow 3s ease-in-out infinite;
+    overflow: hidden;
+}
+
+.sketch-upload-modal-body {
+    display: flex;
+    min-height: 360px;
+}
+
+.sketch-preview-pane {
+    width: 300px;
+    flex-shrink: 0;
+    background: var(--bg-3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-right: 1px solid #c8b89a;
+    overflow: hidden;
+    min-height: 300px;
+}
+
+.sketch-preview-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+}
+
+.sketch-preview-img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    max-height: 400px;
+    display: block;
+}
+
+.sketch-form-pane {
+    flex: 1;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    min-width: 0;
+}
+
+.sketch-modal-filename {
+    font-family: 'SFMono-Regular', 'Consolas', 'Liberation Mono', monospace;
+    font-size: 12px;
+    color: #3dba72;
+    margin-bottom: 18px;
+    word-break: break-all;
+    line-height: 1.5;
+}
+
+.sketch-modal-actions {
+    display: flex;
+    gap: 9px;
+    margin-top: auto;
+    padding-top: 16px;
+}
+
+/* ── Pencil Loader ───────────────────────────────── */
+
+.pencil-loader-wrap {
+    transform-origin: bottom center;
+    animation: pencilBreathe 2s ease-in-out infinite;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+}
+
+@keyframes pencilBreathe {
+    0%, 100% { transform: scaleY(1); }
+    50%      { transform: scaleY(1.05); }
+}
+
+.pencil-loader {
+    width: 12px;
+    height: 50px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    animation: pencilFlip 3s ease-in-out infinite;
+}
+
+@keyframes pencilFlip {
+    0%, 55%  { transform: rotate(0deg); }
+    75%, 100%{ transform: rotate(360deg); }
+}
+
+.pencil-eraser {
+    width: 12px;
+    height: 6px;
+    background: #c4a0a0;
+    border-radius: 2px 2px 0 0;
+    flex-shrink: 0;
+}
+
+.pencil-band {
+    width: 12px;
+    height: 4px;
+    background: #888;
+    flex-shrink: 0;
+}
+
+.pencil-stripe {
+    width: 12px;
+    height: 4px;
+    background: #a09070;
+    flex-shrink: 0;
+}
+
+.pencil-body {
+    width: 12px;
+    height: 26px;
+    background: #c8b89a;
+    flex-shrink: 0;
+}
+
+.pencil-tipcap {
+    width: 12px;
+    height: 4px;
+    background: #b0a082;
+    flex-shrink: 0;
+}
+
+.pencil-tip {
+    width: 0;
+    height: 0;
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-top: 6px solid #d4a878;
+    flex-shrink: 0;
+}
+
+.pencil-loader-text {
+    font-family: 'SFMono-Regular', 'Consolas', 'Liberation Mono', monospace;
+    font-size: 11px;
+    color: #555;
+    letter-spacing: 0.02em;
+}
+
+/* ── Sketch Expanded Modal ───────────────────────── */
+
+.sketch-expanded-modal {
+    max-width: 900px;
+    width: 92vw;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+    overflow: hidden;
+}
+
+.sketch-expanded-topbar {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    gap: 16px;
+    flex-shrink: 0;
+}
+
+.sketch-expanded-info { flex: 1; min-width: 0; }
+
+.sketch-expanded-date {
+    font-family: 'SFMono-Regular', 'Consolas', 'Liberation Mono', monospace;
+    font-size: 12px;
+    color: #3dba72;
+    letter-spacing: 0.04em;
+    margin-bottom: 4px;
+}
+
+.sketch-expanded-desc {
+    font-size: 13px;
+    color: var(--text-2);
+    line-height: 1.5;
+}
+
+.sketch-expanded-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.sketch-expanded-img-wrap {
+    flex: 1;
+    overflow: auto;
+    background: var(--bg-3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    min-height: 200px;
+}
+
+.sketch-expanded-img {
+    max-width: 100%;
+    max-height: 72vh;
+    object-fit: contain;
+    border-radius: var(--radius-sm);
+    display: block;
+}
+
+/* ── Responsive Sketch ───────────────────────────── */
+
+@media (max-width: 900px) {
+    .sketch-grid { grid-template-columns: repeat(2, 1fr); }
+    .sketch-upload-modal-body { flex-direction: column; }
+    .sketch-preview-pane {
+        width: 100%;
+        border-right: none;
+        border-bottom: 1px solid #c8b89a;
+        min-height: 180px;
+        max-height: 240px;
+    }
+}
+
+@media (max-width: 600px) {
+    .sketch-grid { grid-template-columns: 1fr; }
+    .sketch-expanded-modal { width: 98vw; }
+}
