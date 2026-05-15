@@ -2640,3 +2640,21 @@ body {
 .pin-key--ghost  { visibility: hidden; pointer-events: none; }
 .pin-key--action { font-size: 17px; color: var(--text-2); border-color: transparent; background: transparent; }
 .pin-key--action:hover { background: var(--bg-2); }
+
+@media (max-width: 400px) {
+    .pin-screen  { padding: 24px 12px 28px; }
+    .pin-brand   { margin-bottom: 36px; }
+    .pin-brand-title { font-size: 26px; }
+    .pin-pad     { grid-template-columns: repeat(3, 68px); gap: 10px; }
+    .pin-key     { width: 68px; height: 68px; font-size: 20px; }
+    .pin-dots    { gap: 14px; }
+}
+
+@media (max-height: 680px) {
+    .pin-screen  { padding: 16px 24px 20px; }
+    .pin-brand   { margin-bottom: 28px; }
+    .pin-brand-title { font-size: 24px; }
+    .pin-subtitle { margin-bottom: 18px; }
+    .pin-title   { margin-bottom: 16px; }
+    .pin-dots    { margin-bottom: 8px; }
+}

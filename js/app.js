@@ -31,8 +31,7 @@ function esc(str) {
 
 // ── PIN Lock ──────────────────────────────────
 
-const PIN_HASH_KEY    = 'cbu_pin_hash';
-const PIN_SESSION_KEY = 'cbu_pin_session';
+const PIN_HASH_KEY = 'cbu_pin_hash';
 
 async function pinSHA256(str) {
     const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
@@ -44,11 +43,6 @@ let _pinEntry = '';
 let _pinFirst = '';
 
 async function pinBoot() {
-    if (sessionStorage.getItem(PIN_SESSION_KEY) === 'ok') {
-        driveStart();
-        return;
-    }
-
     // Show PIN screen in a connecting state while we silently auth Drive
     const screen = document.getElementById('pinScreen');
     if (screen) screen.style.display = '';
@@ -189,7 +183,6 @@ function _pinSuccessUnlock() {
     document.querySelectorAll('.pin-dot').forEach(d => d.classList.add('success'));
     setTimeout(() => {
         _hidePinScreen();
-        sessionStorage.setItem(PIN_SESSION_KEY, 'ok');
         driveStart();
     }, 380);
 }
