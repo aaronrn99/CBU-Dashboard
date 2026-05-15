@@ -48,8 +48,39 @@ async function pinBoot() {
         driveStart();
         return;
     }
+
+    // Show PIN screen in a connecting state while we silently auth Drive
+    const screen = document.getElementById('pinScreen');
+    if (screen) screen.style.display = '';
+    _pinSetConnecting(true);
+
+    try {
+        await drivePreload();
+        // Pull pinHash from Drive — prevents a new setup on a fresh browser
+        const driveHash = driveGet('pinHash', null);
+        if (driveHash) localStorage.setItem(PIN_HASH_KEY, driveHash);
+    } catch {
+        // Drive unavailable — fall through to localStorage
+    }
+
+    _pinSetConnecting(false);
     const stored = localStorage.getItem(PIN_HASH_KEY);
     _showPinScreen(stored ? 'verify' : 'create');
+}
+
+function _pinSetConnecting(on) {
+    const titleEl = document.getElementById('pinTitle');
+    const subEl   = document.getElementById('pinSubtitle');
+    const pad     = document.querySelector('.pin-pad');
+    const dotsEl  = document.querySelector('.pin-dots');
+    if (titleEl) titleEl.textContent = on ? 'Connecting…' : '';
+    if (subEl)   {
+        subEl.textContent = on ? 'Syncing your security settings…' : '';
+        subEl.style.color = 'var(--text-3)';
+        if (!on) delete subEl.dataset.err;
+    }
+    if (pad)    pad.style.visibility    = on ? 'hidden' : '';
+    if (dotsEl) dotsEl.style.visibility = on ? 'hidden' : '';
 }
 
 function _showPinScreen(mode) {
@@ -117,6 +148,7 @@ async function pinSubmit() {
     } else if (_pinMode === 'confirm') {
         if (_pinEntry === _pinFirst) {
             localStorage.setItem(PIN_HASH_KEY, hash);
+            driveSet('pinHash', hash);
             _pinSuccessUnlock();
         } else {
             _pinFirst = '';
@@ -142,6 +174,7 @@ async function pinSubmit() {
     } else if (_pinMode === 'change_confirm') {
         if (_pinEntry === _pinFirst) {
             localStorage.setItem(PIN_HASH_KEY, hash);
+            driveSet('pinHash', hash);
             _hidePinScreen();
             _pinSetStatus('PIN updated successfully.');
         } else {

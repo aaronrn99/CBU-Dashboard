@@ -7,11 +7,12 @@
 const DRIVE_FILE  = 'cbu-dashboard.json';
 const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/drive.file';
 
-let _token      = null;
-let _fileId     = null;
-let _cache      = {};
-let _connected  = false;
-let _flushTimer = null;
+let _token          = null;
+let _fileId         = null;
+let _cache          = {};
+let _connected      = false;
+let _flushTimer     = null;
+let _refreshStarted = false;
 
 // ── Public API ─────────────────────────────────
 
@@ -44,7 +45,28 @@ document.addEventListener('DOMContentLoaded', () => {
     // _driveInit() is called by pin.js via driveStart() after PIN verification
 });
 
-function driveStart() { _driveInit(); }
+// Called by pin.js after PIN verified. If Drive was already preloaded,
+// skip re-auth and just boot the app.
+function driveStart() {
+    if (_connected) {
+        _migrateFromLocalStorage();
+        _setStatus('connected');
+        _hideOverlay();
+        init();
+        _startRefresh();
+    } else {
+        _driveInit();
+    }
+}
+
+// Silent auth + file load — used by pin.js before showing PIN screen.
+// Does NOT call init(); that happens after PIN is verified via driveStart().
+async function drivePreload() {
+    await _waitForGIS();
+    await _getToken(true);
+    await _loadOrCreateFile();
+    _connected = true;
+}
 
 async function _driveInit() {
     _setStatus('connecting');
@@ -63,7 +85,12 @@ async function _driveInit() {
     }
     // Boot the app (falls back to localStorage if Drive not connected)
     init();
-    // Proactively refresh token every 45 min
+    _startRefresh();
+}
+
+function _startRefresh() {
+    if (_refreshStarted) return;
+    _refreshStarted = true;
     setInterval(() => _getToken(true).catch(() => {}), 45 * 60 * 1000);
 }
 
