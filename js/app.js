@@ -2876,6 +2876,10 @@ function showClaudeToast(msg) {
     el._timer = setTimeout(() => el.classList.remove('show'), 4000);
 }
 
+function renderClaudeText(text) {
+    return esc(text).replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
+}
+
 function renderChatHistory() {
     const el = document.getElementById('claudeChatHistory');
     if (!el) return;
@@ -2885,7 +2889,7 @@ function renderChatHistory() {
     }
     el.innerHTML = claudeHistory.map(m => {
         if (m.role === 'user')      return `<div class="claude-msg claude-msg-user">${esc(m.content)}</div>`;
-        if (m.role === 'assistant') return `<div class="claude-msg claude-msg-claude">${esc(m.content)}</div>`;
+        if (m.role === 'assistant') return `<div class="claude-msg claude-msg-claude">${renderClaudeText(m.content)}</div>`;
         if (m.role === '_error')    return `<div class="claude-msg claude-msg-error">${esc(m.content)}</div>`;
         if (m.role === '_image')    return `<div class="claude-msg-image">
             <img src="${esc(m.content)}" alt="${esc(m.caption || 'Sketch')}" class="claude-sketch-inline">
@@ -2912,9 +2916,10 @@ function renderChatHistory() {
 
 const CLAUDE_PERSONA =
     'You are a helpful assistant built into a student architecture dashboard for Aaron at CBU (Fall 2026). ' +
-    'Respond in plain conversational prose — no markdown bold (**), no bullet points, no dashes, no section headers, no numbered lists. ' +
+    'Respond in plain conversational prose — no bullet points, no dashes, no section headers, no numbered lists. ' +
     'When listing files, PDFs, sketches, assignments, or any dashboard items, weave them into natural sentences. ' +
-    'For example instead of "• Thesis.pdf (7.4 MB)" say "You have one thesis PDF — Thesis.pdf (7.4 MB), added May 14." ' +
+    'Use **bold** (double asterisks) only for file names, PDF titles, and sketch names when you mention them — no other bold. ' +
+    'For example: "You have one thesis PDF — **Thesis.pdf** (7.4 MB), added May 14." ' +
     'Keep responses concise and direct.';
 
 const FULL_READ_TRIGGERS = [
