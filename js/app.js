@@ -2763,7 +2763,7 @@ function buildDashboardContext() {
             state.thesis.pdfs.forEach(p => {
                 const added = p.addedAt ? new Date(p.addedAt).toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' }) : '';
                 const size  = p.size ? fmtFileSize(p.size) : '';
-                lines.push(`    • ${p.name}${size ? ' (' + size + ')' : ''} — Added ${added}`);
+                lines.push(`    • ${p.name}${size ? ' (' + size + ')' : ''} — Added ${added}${p.driveId ? ' [Drive ID: ' + p.driveId + ']' : ''}`);
             });
         }
         if (state.thesis.links.length) {
@@ -2891,6 +2891,20 @@ function renderChatHistory() {
             <img src="${esc(m.content)}" alt="${esc(m.caption || 'Sketch')}" class="claude-sketch-inline">
             <div class="claude-sketch-caption">${esc(m.caption || '')}</div>
         </div>`;
+        if (m.role === '_pdfs') return (m.pdfs || []).map(p => `
+            <div class="claude-pdf-result-card">
+                <span class="claude-pdf-result-icon">📄</span>
+                <div class="claude-pdf-result-info">
+                    <div class="claude-pdf-result-name">${esc(p.name)}</div>
+                    <div class="claude-pdf-result-meta">${p.size ? fmtFileSize(p.size) + ' · ' : ''}${p.addedAt ? fmtNoteDate(p.addedAt) : ''}</div>
+                </div>
+                <div class="claude-pdf-result-actions">
+                    <button class="btn btn-ghost" style="font-size:12px;padding:5px 10px"
+                        onclick="openDriveFile('${esc(p.driveId)}','${esc(p.name)}','application/pdf')">Open in Drive ↗</button>
+                    <button class="btn btn-ghost" style="font-size:12px;padding:5px 10px"
+                        onclick="initSummarizePdf(${p.id})">Summarize</button>
+                </div>
+            </div>`).join('');
         return '';
     }).join('');
     el.scrollTop = el.scrollHeight;
@@ -2902,6 +2916,28 @@ const FULL_READ_TRIGGERS = [
 ];
 
 const SKETCH_SHOW_TRIGGERS = ['show me', 'show the', 'display the', 'see the sketch', 'view the sketch'];
+
+const PDF_FIND_TRIGGERS = [
+    'find pdf', 'open pdf', 'show pdf', 'search pdf', 'locate pdf',
+    'find the pdf', 'open the pdf', 'find a pdf', 'search for pdf',
+    'find document', 'open document', 'find the document', 'open the document',
+    'find my pdf', 'pull up the pdf', 'get the pdf', 'show me the pdf',
+];
+
+function searchThesisPdfs(query) {
+    const STOP = new Set(['the','a','an','find','open','show','me','pdf','document',
+        'please','can','you','my','thesis','file','look','up','for','about',
+        'get','pull','search','locate','some','any','that']);
+    const terms = query.toLowerCase()
+        .replace(/[^a-z0-9\s]/g, ' ')
+        .split(/\s+/)
+        .filter(w => w.length > 2 && !STOP.has(w));
+    if (!terms.length) return [...state.thesis.pdfs];
+    return state.thesis.pdfs.filter(p => {
+        const name = p.name.toLowerCase().replace(/[^a-z0-9\s]/g, ' ');
+        return terms.some(t => name.includes(t));
+    });
+}
 
 async function sendSimpleMessage() {
     const input   = document.getElementById('claudeChatInput');
@@ -2934,8 +2970,21 @@ async function sendSimpleMessage() {
     input.style.height = '';
     sendBtn.disabled = true;
 
-    // Detect sketch display requests — show thumbnails before sending to Claude
     const lc = text.toLowerCase();
+
+    // Detect PDF find/open requests — show matching PDF cards before Claude's text response
+    const isPdfFind = PDF_FIND_TRIGGERS.some(t => lc.includes(t)) ||
+        ((lc.includes('find') || lc.includes('open') || lc.includes('pull up') || lc.includes('show me')) &&
+         (lc.includes('pdf') || lc.includes('document')) &&
+         state.thesis.pdfs.length > 0);
+    if (isPdfFind && state.thesis.pdfs.length) {
+        const matches = searchThesisPdfs(text);
+        if (matches.length) {
+            claudeHistory.push({ role: '_pdfs', pdfs: matches });
+        }
+    }
+
+    // Detect sketch display requests — show thumbnails before sending to Claude
     const wantsSketch = SKETCH_SHOW_TRIGGERS.some(t => lc.includes(t)) &&
                         (lc.includes('sketch') || lc.includes('drawing'));
     if (wantsSketch && state.sketches.length) {

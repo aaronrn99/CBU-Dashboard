@@ -2184,6 +2184,38 @@ body {
     40%            { opacity: 1;    transform: scale(1.1); }
 }
 
+/* ── Claude inline PDF result cards (from PDF search) ── */
+.claude-pdf-result-card {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    padding: 10px 13px;
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 6px;
+    transition: border-color var(--ease);
+}
+.claude-pdf-result-card:hover { border-color: var(--text-3); }
+
+.claude-pdf-result-icon { font-size: 20px; flex-shrink: 0; line-height: 1; }
+
+.claude-pdf-result-info { flex: 1; min-width: 0; }
+
+.claude-pdf-result-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-1);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-bottom: 2px;
+}
+
+.claude-pdf-result-meta { font-size: 11px; color: var(--text-3); }
+
+.claude-pdf-result-actions { display: flex; gap: 6px; flex-shrink: 0; }
+
 /* ── Claude PDF attachment card ─────────────────── */
 .claude-pdf-card {
     display: flex;
