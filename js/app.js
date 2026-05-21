@@ -434,7 +434,7 @@ async function syncCanvas() {
 
     if (!url || !token) {
         statusEl.className = 'canvas-status error';
-        statusEl.textContent = 'Canvas not configured — click "Canvas Settings" in the sidebar.';
+        statusEl.textContent = 'Canvas not configured — add your URL and token in Settings.';
         return;
     }
 
@@ -2608,6 +2608,17 @@ function renderSettingsSection() {
         aStatus.textContent = aKey ? 'API key saved' : '';
     }
 
+    // Canvas
+    const cvUrl  = document.getElementById('canvasUrl');
+    const cvTok  = document.getElementById('canvasToken');
+    const cvDot  = document.getElementById('canvasSettingsDot');
+    const cvStat = document.getElementById('canvasSettingsStatus');
+    if (cvUrl)  cvUrl.value  = state.canvasSettings.url   || '';
+    if (cvTok)  cvTok.value  = state.canvasSettings.token || '';
+    const hasCanvas = !!(state.canvasSettings.url && state.canvasSettings.token);
+    if (cvDot)  cvDot.className = `settings-status-dot${hasCanvas ? ' connected' : ''}`;
+    if (cvStat) { cvStat.textContent = ''; cvStat.className = 'settings-status'; }
+
     // API Credits
     const apiBalance  = parseFloat(driveGet('api_balance', '0'));
     const apiWarning  = parseFloat(driveGet('api_warning', '2'));
@@ -3098,21 +3109,22 @@ function bindEvents() {
     });
     document.getElementById('overlayBg')?.addEventListener('click', closeSidebar);
 
-    // Canvas settings modal
-    document.getElementById('canvasSettingsBtn')?.addEventListener('click', () => {
-        document.getElementById('canvasUrl').value   = state.canvasSettings.url;
-        document.getElementById('canvasToken').value = state.canvasSettings.token;
-        openModal('canvasModal');
-    });
-    document.getElementById('closeCanvasModal')?.addEventListener('click',  () => closeModal('canvasModal'));
-    document.getElementById('cancelCanvasModal')?.addEventListener('click', () => closeModal('canvasModal'));
+    // Canvas settings (inline in Settings tab)
     document.getElementById('saveCanvasSettings')?.addEventListener('click', () => {
         state.canvasSettings = {
-            url:   document.getElementById('canvasUrl').value.trim(),
-            token: document.getElementById('canvasToken').value.trim(),
+            url:   document.getElementById('canvasUrl')?.value.trim()   || '',
+            token: document.getElementById('canvasToken')?.value.trim() || '',
         };
         save('canvasSettings', state.canvasSettings);
-        closeModal('canvasModal');
+        const dot  = document.getElementById('canvasSettingsDot');
+        const stat = document.getElementById('canvasSettingsStatus');
+        const has  = !!(state.canvasSettings.url && state.canvasSettings.token);
+        if (dot)  dot.className = `settings-status-dot${has ? ' connected' : ''}`;
+        if (stat) {
+            stat.className   = 'settings-status settings-status-saved';
+            stat.textContent = 'Settings saved.';
+            setTimeout(() => { stat.textContent = ''; stat.className = 'settings-status'; }, 3000);
+        }
     });
 
     // Canvas sync
@@ -3233,13 +3245,6 @@ function bindEvents() {
         ta.style.height = Math.min(ta.scrollHeight, 96) + 'px';
     });
 
-    // Settings — Canvas (opens existing modal)
-    document.getElementById('settingsCanvasBtn')?.addEventListener('click', () => {
-        document.getElementById('canvasUrl').value   = state.canvasSettings.url;
-        document.getElementById('canvasToken').value = state.canvasSettings.token;
-        openModal('canvasModal');
-    });
-
     // Calendar
     document.getElementById('addCalEventBtn')?.addEventListener('click', () => {
         document.getElementById('calEventLabel').value    = '';
@@ -3257,7 +3262,7 @@ function bindEvents() {
     });
 
     // Close modals on backdrop click
-    ['canvasModal', 'scheduleModal', 'schedCustomEventModal', 'thesisLinkModal', 'calEventModal',
+    ['scheduleModal', 'schedCustomEventModal', 'thesisLinkModal', 'calEventModal',
      'sketchUploadModal', 'sketchExpandedModal'].forEach(id => {
         document.getElementById(id)?.addEventListener('click', e => {
             if (e.target === document.getElementById(id)) closeModal(id);
@@ -3267,7 +3272,7 @@ function bindEvents() {
     // Close modals on Escape key
     document.addEventListener('keydown', e => {
         if (e.key === 'Escape') {
-            ['canvasModal', 'scheduleModal', 'schedCustomEventModal', 'thesisLinkModal', 'calEventModal',
+            ['scheduleModal', 'schedCustomEventModal', 'thesisLinkModal', 'calEventModal',
              'sketchUploadModal', 'sketchExpandedModal'].forEach(id => {
                 if (document.getElementById(id)?.classList.contains('open')) closeModal(id);
             });
