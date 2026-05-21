@@ -2887,6 +2887,138 @@ function closeModal(id) {
     document.getElementById(id)?.classList.remove('open');
 }
 
+// ── Nav Drag-to-Reorder ───────────────────────
+
+function initNavDragSort() {
+    const list = document.querySelector('.nav-links');
+    if (!list) return;
+
+    _applyNavOrder(_loadNavOrder());
+
+    let dragging       = null;
+    let ghost          = null;
+    let indicator      = null;
+    let pointerOffsetY = 0;
+    let dragStarted    = false;
+    let startY         = 0;
+
+    const THRESHOLD = 6;
+
+    function liveItems() {
+        return Array.from(list.children).filter(el => el !== indicator);
+    }
+
+    list.addEventListener('pointerdown', e => {
+        const handle = e.target.closest('.nav-drag-handle');
+        if (!handle) return;
+        const li = handle.closest('li');
+        if (!li || !list.contains(li)) return;
+
+        e.preventDefault();
+        dragging       = li;
+        dragStarted    = false;
+        startY         = e.clientY;
+        pointerOffsetY = e.clientY - li.getBoundingClientRect().top;
+        list.setPointerCapture(e.pointerId);
+    });
+
+    list.addEventListener('pointermove', e => {
+        if (!dragging) return;
+        e.preventDefault();
+
+        if (!dragStarted) {
+            if (Math.abs(e.clientY - startY) < THRESHOLD) return;
+            dragStarted = true;
+
+            const rect = dragging.getBoundingClientRect();
+            ghost = dragging.cloneNode(true);
+            ghost.classList.add('nav-drag-ghost');
+            ghost.style.cssText = [
+                'position:fixed',
+                `left:${rect.left}px`,
+                `top:${rect.top}px`,
+                `width:${rect.width}px`,
+                'z-index:9999',
+                'pointer-events:none',
+                'margin:0',
+                'padding:0',
+            ].join(';');
+            document.body.appendChild(ghost);
+            dragging.classList.add('nav-item-dragging');
+
+            indicator = document.createElement('li');
+            indicator.className = 'nav-drop-line';
+        }
+
+        ghost.style.top = (e.clientY - pointerOffsetY) + 'px';
+
+        const items = liveItems().filter(li => li !== dragging);
+        let insertBefore = null;
+        for (const item of items) {
+            const r = item.getBoundingClientRect();
+            if (e.clientY < r.top + r.height / 2) { insertBefore = item; break; }
+        }
+
+        indicator.remove();
+        if (insertBefore) {
+            list.insertBefore(indicator, insertBefore);
+        } else {
+            list.appendChild(indicator);
+        }
+    });
+
+    function finishDrag() {
+        if (!dragging) return;
+
+        if (dragStarted) {
+            if (indicator && indicator.parentNode === list) {
+                list.insertBefore(dragging, indicator);
+            }
+            indicator?.remove();
+            ghost?.remove();
+            _saveNavOrder();
+        }
+
+        dragging.classList.remove('nav-item-dragging');
+        dragging    = null;
+        ghost       = null;
+        indicator   = null;
+        dragStarted = false;
+    }
+
+    list.addEventListener('pointerup',     finishDrag);
+    list.addEventListener('pointercancel', finishDrag);
+}
+
+function _saveNavOrder() {
+    const sections = Array.from(
+        document.querySelectorAll('.nav-links [data-section]')
+    ).map(a => a.dataset.section);
+    try { localStorage.setItem('cbu_nav_order', JSON.stringify(sections)); } catch {}
+}
+
+function _loadNavOrder() {
+    try {
+        const raw = localStorage.getItem('cbu_nav_order');
+        return (raw ? JSON.parse(raw) : []) || [];
+    } catch { return []; }
+}
+
+function _applyNavOrder(order) {
+    if (!order.length) return;
+    const list = document.querySelector('.nav-links');
+    if (!list) return;
+    const items = Array.from(list.children);
+    const ordered = [];
+    order.forEach(section => {
+        const item = items.find(li => li.querySelector?.(`[data-section="${section}"]`));
+        if (item && !ordered.includes(item)) ordered.push(item);
+    });
+    // Append any new items not in saved order at the end
+    items.forEach(li => { if (!ordered.includes(li)) ordered.push(li); });
+    ordered.forEach(li => list.appendChild(li));
+}
+
 // ── Event Binding ─────────────────────────────
 function bindEvents() {
     // Navigation
@@ -3087,6 +3219,9 @@ function bindEvents() {
 
     // Sketch Log
     bindSketchLog();
+
+    // Nav drag-to-reorder
+    initNavDragSort();
 }
 
 function closeSidebar() {
