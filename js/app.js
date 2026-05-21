@@ -2910,6 +2910,13 @@ function renderChatHistory() {
     el.scrollTop = el.scrollHeight;
 }
 
+const CLAUDE_PERSONA =
+    'You are a helpful assistant built into a student architecture dashboard for Aaron at CBU (Fall 2026). ' +
+    'Respond in plain conversational prose — no markdown bold (**), no bullet points, no dashes, no section headers, no numbered lists. ' +
+    'When listing files, PDFs, sketches, assignments, or any dashboard items, weave them into natural sentences. ' +
+    'For example instead of "• Thesis.pdf (7.4 MB)" say "You have one thesis PDF — Thesis.pdf (7.4 MB), added May 14." ' +
+    'Keep responses concise and direct.';
+
 const FULL_READ_TRIGGERS = [
     'read the full document', 'read this document', 'analyze this pdf',
     'analyze the pdf', 'read this pdf', 'full document', 'read the document',
@@ -3016,9 +3023,7 @@ async function sendSimpleMessage() {
 
     try {
         const systemPrompt =
-            'You are a helpful assistant built into a student architecture dashboard for Aaron at CBU (Fall 2026). ' +
-            'Be concise and practical. Here is the full dashboard context:\n\n' +
-            buildDashboardContext();
+            CLAUDE_PERSONA + ' Here is the full dashboard context:\n\n' + buildDashboardContext();
 
         const reply = await callClaudeAPI(
             claudeHistory.filter(m => m.role === 'user' || m.role === 'assistant'),
@@ -3132,9 +3137,7 @@ async function summarizePdfFull(pdf, userText) {
         const base64 = await blobToBase64(blob);
 
         const systemPrompt =
-            'You are a helpful assistant built into a student architecture dashboard for Aaron at CBU (Fall 2026). ' +
-            'Be concise and practical. Here is the full dashboard context:\n\n' +
-            buildDashboardContext();
+            CLAUDE_PERSONA + ' Here is the full dashboard context:\n\n' + buildDashboardContext();
 
         const apiMessages = [
             ...claudeHistory.slice(0, -1).filter(m => m.role === 'user' || m.role === 'assistant'),
