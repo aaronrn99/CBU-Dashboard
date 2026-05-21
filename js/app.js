@@ -873,8 +873,7 @@ async function handleStudioUpload(files) {
         </div>`).join('')}
     </div>`;
     try {
-        const cbuId  = await getCBUFolder();
-        const projId = await getOrCreateSubfolder(cbuId, `Project ${currentProjectId}`);
+        const projId = await getProjectFolder(currentProjectId);
         await Promise.allSettled(items.map(async item => {
             const barEl    = document.getElementById(`${item.uid}-bar`);
             const statusEl = document.getElementById(`${item.uid}-status`);
@@ -1963,9 +1962,11 @@ function gridDayClick(dateStr) {
 
 // ── Files & Google Drive ──────────────────────
 
-let filesPathStack = [{ id: null, label: 'CBU Dashboard' }];
-let _cbuFolderId   = null;
-let _filesEntries  = [];
+let filesPathStack    = [{ id: null, label: 'CBU Dashboard' }];
+let _cbuFolderId      = null;
+let _projectsFolderId = null;
+const _projectFolderIds = {};   // projectId → Drive folder ID
+let _filesEntries     = [];
 
 function getAnthropicKey() { try { return localStorage.getItem('cbu_anthropicKey') || ''; } catch { return ''; } }
 
@@ -1996,6 +1997,20 @@ async function getOrCreateSubfolder(parentId, name) {
         body:    JSON.stringify({ name, mimeType: 'application/vnd.google-apps.folder', parents: [parentId] }),
     });
     return (await cr.json()).id;
+}
+
+async function getProjectsFolder() {
+    if (_projectsFolderId) return _projectsFolderId;
+    const cbuId = await getCBUFolder();
+    _projectsFolderId = await getOrCreateSubfolder(cbuId, 'Projects');
+    return _projectsFolderId;
+}
+
+async function getProjectFolder(projectId) {
+    if (_projectFolderIds[projectId]) return _projectFolderIds[projectId];
+    const projectsId = await getProjectsFolder();
+    _projectFolderIds[projectId] = await getOrCreateSubfolder(projectsId, `Project ${projectId}`);
+    return _projectFolderIds[projectId];
 }
 
 const FILE_ICONS = {
