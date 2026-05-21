@@ -2790,6 +2790,7 @@ body {
     border-radius: var(--radius);
     overflow: hidden;
     cursor: pointer;
+    position: relative;
     animation: sketchCardIn 0.45s ease forwards;
     opacity: 0;
     transition: box-shadow 0.35s ease;
@@ -2800,6 +2801,98 @@ body {
         0 0 8px 2px rgba(200, 184, 154, 0.35),
         0 0 16px 5px rgba(200, 184, 154, 0.17),
         0 0 28px 8px rgba(200, 184, 154, 0.07);
+}
+
+/* ── Sketch card delete button ───── */
+.sketch-card-del {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(9, 12, 16, 0.65);
+    color: var(--text-2);
+    font-size: 13px;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease;
+    z-index: 2;
+    padding: 0;
+    font-family: inherit;
+}
+
+.sketch-card:hover .sketch-card-del        { opacity: 1; }
+.sketch-card-del:hover                      { background: rgba(248, 81, 73, 0.75); color: #fff; }
+
+/* ── Sketch card inline confirmation ── */
+.sketch-card-confirm {
+    position: absolute;
+    inset: 0;
+    background: rgba(9, 12, 16, 0.86);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    z-index: 3;
+    backdrop-filter: blur(3px);
+    border-radius: var(--radius);
+}
+
+.sketch-card-confirm-text {
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--text-1);
+}
+
+.sketch-card-confirm-btns {
+    display: flex;
+    gap: 8px;
+}
+
+.sketch-card-confirm-yes {
+    padding: 5px 16px;
+    border-radius: var(--radius-sm);
+    border: 1px solid rgba(248, 81, 73, 0.35);
+    background: var(--red-dim);
+    color: var(--red);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background var(--ease), border-color var(--ease);
+}
+.sketch-card-confirm-yes:hover { background: rgba(248, 81, 73, 0.22); border-color: var(--red); }
+
+.sketch-card-confirm-no {
+    padding: 5px 16px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-2);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background var(--ease), color var(--ease);
+}
+.sketch-card-confirm-no:hover { background: var(--bg-3); color: var(--text-1); }
+
+/* ── Sketch card remove animation ── */
+@keyframes sketchCardOut {
+    from { opacity: 1; transform: scale(1); }
+    to   { opacity: 0; transform: scale(0.9); }
+}
+
+.sketch-card-removing {
+    animation: sketchCardOut 0.25s ease forwards !important;
+    pointer-events: none;
 }
 
 .sketch-card-meta-row {

@@ -2382,6 +2382,14 @@ function renderSketchLog() {
             : '';
         return `
         <div class="sketch-card" data-id="${s.id}" style="animation-delay:${i * 60}ms" onclick="openSketchExpanded(${s.id})">
+            <button class="sketch-card-del" onclick="showSketchDeleteConfirm(event,${s.id})" aria-label="Delete sketch" title="Delete">✕</button>
+            <div class="sketch-card-confirm" style="display:none">
+                <div class="sketch-card-confirm-text">Delete this sketch?</div>
+                <div class="sketch-card-confirm-btns">
+                    <button class="sketch-card-confirm-yes" onclick="confirmDeleteSketch(event,${s.id})">Yes</button>
+                    <button class="sketch-card-confirm-no" onclick="cancelDeleteSketch(event,${s.id})">No</button>
+                </div>
+            </div>
             <div class="sketch-card-meta-row">
                 <span class="sketch-card-date">${esc(dateLabel)}</span>
             </div>
@@ -2394,6 +2402,44 @@ function renderSketchLog() {
     }).join('');
 
     grid.querySelectorAll('.sketch-card-thumb').forEach(img => loadSketchThumbnail(img));
+}
+
+function showSketchDeleteConfirm(e, id) {
+    e.stopPropagation();
+    const card = document.querySelector(`.sketch-card[data-id="${id}"]`);
+    if (!card) return;
+    card.querySelector('.sketch-card-confirm').style.display = '';
+    card.querySelector('.sketch-card-del').style.display     = 'none';
+}
+
+function cancelDeleteSketch(e, id) {
+    e.stopPropagation();
+    const card = document.querySelector(`.sketch-card[data-id="${id}"]`);
+    if (!card) return;
+    card.querySelector('.sketch-card-confirm').style.display = 'none';
+    card.querySelector('.sketch-card-del').style.display     = '';
+}
+
+async function confirmDeleteSketch(e, id) {
+    e.stopPropagation();
+    const sketch = state.sketches.find(s => s.id === id);
+    if (!sketch) return;
+
+    const card = document.querySelector(`.sketch-card[data-id="${id}"]`);
+    if (card) {
+        card.classList.add('sketch-card-removing');
+        await new Promise(r => setTimeout(r, 260));
+        card.remove();
+    }
+
+    state.sketches = state.sketches.filter(s => s.id !== id);
+    save('sketches', state.sketches);
+
+    if (sketch.driveId) {
+        driveReq(`https://www.googleapis.com/drive/v3/files/${sketch.driveId}`, { method: 'DELETE' }).catch(() => {});
+    }
+
+    if (!state.sketches.length) renderSketchLog();
 }
 
 async function loadSketchThumbnail(img) {
