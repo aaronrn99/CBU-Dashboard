@@ -1669,7 +1669,11 @@ function renderThesisPdfs() {
                 <div class="pdf-name">${esc(p.name)}</div>
                 <div class="pdf-meta">${p.size ? fmtFileSize(p.size) + ' · ' : ''}Added ${fmtNoteDate(p.addedAt)}</div>
             </div>
-            <div class="pdf-actions">
+            <div class="pdf-actions" style="flex-wrap:wrap;gap:5px">
+                <button class="btn btn-ghost" style="font-size:12px;padding:5px 10px"
+                    onclick="openPdfInClaude(${p.id})">Ask Claude →</button>
+                <button class="btn btn-ghost" style="font-size:12px;padding:5px 10px"
+                    onclick="initSummarizePdf(${p.id})">Summarize</button>
                 <button class="btn btn-ghost" style="font-size:12px;padding:5px 10px"
                     onclick="openThesisPdf(${p.id})">Open</button>
                 <button class="btn btn-ghost" style="font-size:12px;padding:5px 10px"
@@ -2654,68 +2658,196 @@ function saveAnthropicKey() {
 }
 
 function buildDashboardContext() {
-    const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-    const lines = [`Today is ${today}.`, ''];
+    const now     = new Date();
+    const todayStr = now.toISOString().slice(0, 10);
+    const lines   = [
+        `Current date and time: ${now.toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' })} at ${now.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' })}`,
+        '',
+    ];
 
+    // ── Assignments ──────────────────────────────
     if (state.assignments.length) {
-        lines.push('UPCOMING ASSIGNMENTS:');
-        state.assignments.slice(0, 12).forEach(a => {
+        lines.push(`CANVAS ASSIGNMENTS (${state.assignments.length} total):`);
+        state.assignments.forEach(a => {
             const due = a.dueAt
-                ? new Date(a.dueAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                ? new Date(a.dueAt).toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' })
                 : 'No due date';
-            lines.push(`• ${a.title} (${a.course}) — Due ${due}`);
+            const overdue = a.dueAt && new Date(a.dueAt) < now ? ' [OVERDUE]' : '';
+            lines.push(`• ${a.title} — ${a.course} — Due ${due}${overdue}`);
         });
         lines.push('');
     }
 
-    const delivLines = [];
+    // ── Studio projects ──────────────────────────
+    lines.push('STUDIO PROJECTS:');
     PROJECT_NAMES.forEach((name, i) => {
-        const data = getProjectData(i + 1);
-        data.deliverables.filter(d => !d.completed).forEach(d => {
-            const due = d.dueDate
-                ? new Date(d.dueDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-                : 'No date';
-            delivLines.push(`• [${name}] ${d.name} — Due ${due}`);
-        });
+        const n    = i + 1;
+        const data = getProjectData(n);
+        lines.push(`  ${name}:`);
+        if (data.deliverables.length) {
+            lines.push('    Deliverables:');
+            data.deliverables.forEach(d => {
+                const due = d.dueDate
+                    ? new Date(d.dueDate + 'T12:00:00').toLocaleDateString('en-US', { month:'short', day:'numeric' })
+                    : 'No date';
+                lines.push(`      ${d.completed ? '✓' : '○'} ${d.name} — ${due}`);
+            });
+        }
+        if (data.files.length) {
+            lines.push(`    Files (${data.files.length}): ${data.files.map(f => f.name).join(', ')}`);
+        }
+        if (data.notes.length) {
+            lines.push(`    Notes (${data.notes.length}): ${data.notes.map(n => n.text?.slice(0, 50) || '(note)').join(' | ')}`);
+        }
     });
-    if (delivLines.length) {
-        lines.push('PROJECT DELIVERABLES (pending):');
-        lines.push(...delivLines);
+    lines.push('');
+
+    // ── To-dos (recent 30 days + next 7) ────────
+    const todoLines = [];
+    for (let offset = -30; offset <= 7; offset++) {
+        const d = new Date(now);
+        d.setDate(d.getDate() + offset);
+        const ds    = d.toISOString().slice(0, 10);
+        const todos = getTodosForDay(ds);
+        if (todos.length) {
+            const label = offset === 0 ? `${ds} (TODAY)` : ds;
+            todoLines.push(`  ${label}:`);
+            todos.forEach(t => todoLines.push(`    ${t.completed ? '✓' : '○'} ${t.text}`));
+        }
+    }
+    if (todoLines.length) {
+        lines.push('TO-DO LISTS:');
+        lines.push(...todoLines);
         lines.push('');
     }
 
-    const todayPending = getTodosForDay(new Date().toISOString().slice(0, 10)).filter(t => !t.completed);
-    if (todayPending.length) {
-        lines.push("TODAY'S TO-DO LIST:");
-        todayPending.slice(0, 8).forEach(t => lines.push(`• ${t.text}`));
-        lines.push('');
-    }
-
-    const todayStr  = new Date().toISOString().slice(0, 10);
+    // ── Calendar (all events) ────────────────────
     const allEvents = [
         ...CBU_FALL_2026,
         ...state.calendarEvents,
         ...state.customEvents.map(e => ({ ...e, label: e.name })),
-    ];
-    const upcoming = allEvents
-        .filter(e => e.date >= todayStr)
-        .sort((a, b) => a.date.localeCompare(b.date))
-        .slice(0, 8);
-    if (upcoming.length) {
-        lines.push('UPCOMING EVENTS:');
-        upcoming.forEach(e => {
-            const d = new Date(e.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-            lines.push(`• ${d} — ${e.label} [${e.category}]`);
+    ].sort((a, b) => a.date.localeCompare(b.date));
+    if (allEvents.length) {
+        lines.push('ACADEMIC & PERSONAL CALENDAR:');
+        allEvents.forEach(e => {
+            const d = new Date(e.date + 'T12:00:00').toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+            const past = e.date < todayStr ? ' [past]' : '';
+            lines.push(`  ${d} — ${e.label} [${e.category}]${past}`);
         });
+        lines.push('');
+    }
+
+    // ── Dashboard notes ──────────────────────────
+    if (state.notes.length) {
+        lines.push(`DASHBOARD NOTES (${state.notes.length}):`);
+        state.notes.forEach(n => {
+            const upd = n.updatedAt ? new Date(n.updatedAt).toLocaleDateString('en-US', { month:'short', day:'numeric' }) : '';
+            lines.push(`  • "${n.title || '(untitled)'}" — ${upd}`);
+        });
+        lines.push('');
+    }
+
+    // ── Thesis ───────────────────────────────────
+    const hasThesis = state.thesis.notes.length || state.thesis.pdfs.length || state.thesis.links.length;
+    if (hasThesis) {
+        lines.push('THESIS:');
+        if (state.thesis.notes.length) {
+            lines.push(`  Notes (${state.thesis.notes.length}):`);
+            state.thesis.notes.forEach(n => {
+                const d = n.updatedAt ? new Date(n.updatedAt).toLocaleDateString('en-US', { month:'short', day:'numeric' }) : '';
+                lines.push(`    • "${n.title || '(untitled)'}" — ${d}`);
+            });
+        }
+        if (state.thesis.pdfs.length) {
+            lines.push(`  PDFs (${state.thesis.pdfs.length}):`);
+            state.thesis.pdfs.forEach(p => {
+                const added = p.addedAt ? new Date(p.addedAt).toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' }) : '';
+                const size  = p.size ? fmtFileSize(p.size) : '';
+                lines.push(`    • ${p.name}${size ? ' (' + size + ')' : ''} — Added ${added}`);
+            });
+        }
+        if (state.thesis.links.length) {
+            lines.push(`  Research Links (${state.thesis.links.length}):`);
+            state.thesis.links.forEach(l => lines.push(`    • ${l.label}`));
+        }
+        lines.push('');
+    }
+
+    // ── Sketch log ───────────────────────────────
+    if (state.sketches.length) {
+        lines.push(`SKETCH LOG (${state.sketches.length} sketches):`);
+        state.sketches.forEach(s => {
+            const d = s.date ? new Date(s.date + 'T12:00:00').toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' }) : 'No date';
+            lines.push(`  • ${s.name} — ${d}${s.desc ? ' — "' + s.desc + '"' : ''}`);
+        });
+        lines.push('');
+    }
+
+    // ── Active PDF ───────────────────────────────
+    if (_activePdfMeta) {
+        lines.push(`ACTIVE DOCUMENT: ${_activePdfMeta.name}${_activePdfMeta.size ? ' (' + fmtFileSize(_activePdfMeta.size) + ')' : ''}`);
+        lines.push('The user is currently discussing this PDF. If they ask you to "read" or "analyze" the full document, remind them to use the Summarize button to send the actual PDF content.');
+        lines.push('');
     }
 
     return lines.join('\n').trim();
+}
+
+// Active PDF attached to chat, and pending summarize target
+let _activePdfMeta        = null;
+let _pendingSummarizeMeta = null;
+
+function deductApiUsage(usage) {
+    if (!usage) return;
+    const iT = usage.input_tokens  || 0;
+    const oT = usage.output_tokens || 0;
+    const c  = (iT / 1e6) * 0.80 + (oT / 1e6) * 4.00;
+    driveSet('api_tokens_input',  String(parseInt(driveGet('api_tokens_input',  '0')) + iT));
+    driveSet('api_tokens_output', String(parseInt(driveGet('api_tokens_output', '0')) + oT));
+    const b = parseFloat(driveGet('api_balance', '0'));
+    if (b > 0) {
+        driveSet('api_balance', String(Math.max(0, b - c)));
+        if (document.getElementById('settings')?.classList.contains('active')) renderApiCreditSection();
+    }
+}
+
+async function callClaudeAPI(messages, systemPrompt, maxTokens = 1000, beta = null) {
+    const body = {
+        model:      'claude-haiku-4-5-20251001',
+        max_tokens: maxTokens,
+        system:     systemPrompt,
+        messages,
+    };
+    if (beta) body.beta = beta;
+    const res = await fetch('/api/claude', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify(body),
+    });
+    if (!res.ok) {
+        let msg = `API error ${res.status}`;
+        try { const j = await res.json(); msg = j.error?.message || msg; } catch {}
+        throw new Error(msg);
+    }
+    const data = await res.json();
+    deductApiUsage(data.usage);
+    return data.content?.[0]?.text || '(empty response)';
+}
+
+function blobToBase64(blob) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload  = () => resolve(reader.result.split(',')[1]);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+    });
 }
 
 function openSimpleMode() {
     document.getElementById('claudeModeSelect').style.display = 'none';
     document.getElementById('claudeInlineChat').style.display = '';
     renderChatHistory();
+    renderPdfCard();
     setTimeout(() => document.getElementById('claudeChatInput')?.focus(), 80);
 }
 
@@ -2755,10 +2887,21 @@ function renderChatHistory() {
         if (m.role === 'user')      return `<div class="claude-msg claude-msg-user">${esc(m.content)}</div>`;
         if (m.role === 'assistant') return `<div class="claude-msg claude-msg-claude">${esc(m.content)}</div>`;
         if (m.role === '_error')    return `<div class="claude-msg claude-msg-error">${esc(m.content)}</div>`;
+        if (m.role === '_image')    return `<div class="claude-msg-image">
+            <img src="${esc(m.content)}" alt="${esc(m.caption || 'Sketch')}" class="claude-sketch-inline">
+            <div class="claude-sketch-caption">${esc(m.caption || '')}</div>
+        </div>`;
         return '';
     }).join('');
     el.scrollTop = el.scrollHeight;
 }
+
+const FULL_READ_TRIGGERS = [
+    'read the full document', 'read this document', 'analyze this pdf',
+    'analyze the pdf', 'read this pdf', 'full document', 'read the document',
+];
+
+const SKETCH_SHOW_TRIGGERS = ['show me', 'show the', 'display the', 'see the sketch', 'view the sketch'];
 
 async function sendSimpleMessage() {
     const input   = document.getElementById('claudeChatInput');
@@ -2766,6 +2909,18 @@ async function sendSimpleMessage() {
     const histEl  = document.getElementById('claudeChatHistory');
     const text    = input?.value.trim();
     if (!text) return;
+
+    // Detect "read full document" trigger when a PDF is attached
+    if (_activePdfMeta) {
+        const lc = text.toLowerCase();
+        if (FULL_READ_TRIGGERS.some(t => lc.includes(t))) {
+            input.value = '';
+            input.style.height = '';
+            await summarizePdfFull(_activePdfMeta, text);
+            input?.focus();
+            return;
+        }
+    }
 
     // Balance warning check
     const _curBal  = parseFloat(driveGet('api_balance',  '0'));
@@ -2779,6 +2934,28 @@ async function sendSimpleMessage() {
     input.style.height = '';
     sendBtn.disabled = true;
 
+    // Detect sketch display requests — show thumbnails before sending to Claude
+    const lc = text.toLowerCase();
+    const wantsSketch = SKETCH_SHOW_TRIGGERS.some(t => lc.includes(t)) &&
+                        (lc.includes('sketch') || lc.includes('drawing'));
+    if (wantsSketch && state.sketches.length) {
+        const matches = state.sketches.filter(s => {
+            const d = (s.desc || '').toLowerCase();
+            const n = (s.name || '').toLowerCase();
+            // If the message mentions words from the description or filename, prefer that sketch
+            const words = lc.split(/\s+/).filter(w => w.length > 3);
+            return words.some(w => d.includes(w) || n.includes(w));
+        });
+        const toShow = matches.length ? matches.slice(0, 3) : state.sketches.slice(0, 1);
+        toShow.forEach(s => {
+            const url = _sketchThumbs[s.driveId];
+            if (url) {
+                const d = s.date ? new Date(s.date + 'T12:00:00').toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' }) : '';
+                claudeHistory.push({ role: '_image', content: url, caption: `${s.name}${d ? ' — ' + d : ''}${s.desc ? ' — ' + s.desc : ''}` });
+            }
+        });
+    }
+
     claudeHistory.push({ role: 'user', content: text });
     renderChatHistory();
 
@@ -2791,45 +2968,15 @@ async function sendSimpleMessage() {
     try {
         const systemPrompt =
             'You are a helpful assistant built into a student architecture dashboard for Aaron at CBU (Fall 2026). ' +
-            'Be concise and practical. Here is the current dashboard context:\n\n' +
+            'Be concise and practical. Here is the full dashboard context:\n\n' +
             buildDashboardContext();
 
-        const res = await fetch('/api/claude', {
-            method:  'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                model:      'claude-haiku-4-5-20251001',
-                max_tokens: 1000,
-                system:     systemPrompt,
-                messages:   claudeHistory.filter(m => m.role === 'user' || m.role === 'assistant'),
-            }),
-        });
-
+        const reply = await callClaudeAPI(
+            claudeHistory.filter(m => m.role === 'user' || m.role === 'assistant'),
+            systemPrompt,
+            1000,
+        );
         typingEl.remove();
-
-        if (!res.ok) {
-            let msg = `API error ${res.status}`;
-            try { const j = await res.json(); msg = j.error?.message || msg; } catch {}
-            throw new Error(msg);
-        }
-
-        const data  = await res.json();
-        // Deduct API cost from tracked balance
-        if (data.usage) {
-            const _iT  = data.usage.input_tokens  || 0;
-            const _oT  = data.usage.output_tokens || 0;
-            const _c   = (_iT / 1e6) * 0.80 + (_oT / 1e6) * 4.00;
-            const _pI  = parseInt(driveGet('api_tokens_input',  '0'));
-            const _pO  = parseInt(driveGet('api_tokens_output', '0'));
-            driveSet('api_tokens_input',  String(_pI + _iT));
-            driveSet('api_tokens_output', String(_pO + _oT));
-            const _b = parseFloat(driveGet('api_balance', '0'));
-            if (_b > 0) {
-                driveSet('api_balance', String(Math.max(0, _b - _c)));
-                if (document.getElementById('settings')?.classList.contains('active')) renderApiCreditSection();
-            }
-        }
-        const reply = data.content?.[0]?.text || '(empty response)';
         claudeHistory.push({ role: 'assistant', content: reply });
         renderChatHistory();
     } catch (err) {
@@ -2839,6 +2986,128 @@ async function sendSimpleMessage() {
     } finally {
         sendBtn.disabled = false;
         input?.focus();
+    }
+}
+
+// ── PDF card helpers ──────────────────────────
+
+function renderPdfCard() {
+    const card   = document.getElementById('claudePdfCard');
+    const nameEl = document.getElementById('claudePdfCardName');
+    const metaEl = document.getElementById('claudePdfCardMeta');
+    if (!card) return;
+    if (!_activePdfMeta) { card.style.display = 'none'; return; }
+    if (nameEl) nameEl.textContent = _activePdfMeta.name;
+    if (metaEl) metaEl.textContent = _activePdfMeta.size ? fmtFileSize(_activePdfMeta.size) : '';
+    card.style.display = '';
+}
+
+function dismissPdfCard() {
+    _activePdfMeta = null;
+    renderPdfCard();
+}
+
+function openPdfInClaude(id) {
+    const pdf = state.thesis.pdfs.find(p => p.id === id);
+    if (!pdf) return;
+    _activePdfMeta = pdf;
+    showSection('claude');
+    openSimpleMode();
+    // Pre-fill message
+    const input = document.getElementById('claudeChatInput');
+    if (input) {
+        input.value = `Tell me about this document: ${pdf.name}`;
+        input.dispatchEvent(new Event('input'));
+        input.focus();
+    }
+}
+
+function initSummarizePdf(id) {
+    const pdf = state.thesis.pdfs.find(p => p.id === id);
+    if (!pdf) return;
+    _pendingSummarizeMeta = pdf;
+    const estTokens = Math.round((pdf.size || 100000) / 200);
+    const estCost   = ((estTokens / 1e6) * 4.00).toFixed(4);
+    const warnEl    = document.getElementById('pdfSummarizeWarningText');
+    if (warnEl) warnEl.textContent =
+        `Summarizing "${pdf.name}" will use approximately ${estTokens.toLocaleString()} tokens (≈ $${estCost}). Continue?`;
+    openModal('pdfSummarizeModal');
+}
+
+function cancelSummarizePdf() {
+    _pendingSummarizeMeta = null;
+    closeModal('pdfSummarizeModal');
+}
+
+async function confirmSummarize() {
+    const pdf = _pendingSummarizeMeta;
+    _pendingSummarizeMeta = null;
+    closeModal('pdfSummarizeModal');
+    if (!pdf) return;
+    _activePdfMeta = pdf;
+    showSection('claude');
+    openSimpleMode();
+    await summarizePdfFull(pdf, `Please summarize this document: ${pdf.name}`);
+}
+
+async function summarizePdfFull(pdf, userText) {
+    if (!pdf?.driveId || !isDriveConnected()) {
+        showClaudeToast('Google Drive not connected — cannot fetch PDF.');
+        return;
+    }
+    const sendBtn = document.getElementById('claudeSendBtn');
+    const histEl  = document.getElementById('claudeChatHistory');
+
+    const balCheck  = parseFloat(driveGet('api_balance',  '0'));
+    const warnCheck = parseFloat(driveGet('api_warning', '2'));
+    if (balCheck > 0 && balCheck <= warnCheck) {
+        const proceed = await showApiWarningModal();
+        if (!proceed) return;
+    }
+
+    if (sendBtn) sendBtn.disabled = true;
+
+    claudeHistory.push({ role: 'user', content: userText });
+    renderChatHistory();
+
+    const typingEl = document.createElement('div');
+    typingEl.className = 'claude-typing';
+    typingEl.innerHTML = '<span></span><span></span><span></span>';
+    histEl?.appendChild(typingEl);
+    if (histEl) histEl.scrollTop = histEl.scrollHeight;
+
+    try {
+        const res = await driveReq(`https://www.googleapis.com/drive/v3/files/${pdf.driveId}?alt=media`);
+        if (!res.ok) throw new Error('Could not fetch PDF from Drive (HTTP ' + res.status + ')');
+        const blob   = await res.blob();
+        const base64 = await blobToBase64(blob);
+
+        const systemPrompt =
+            'You are a helpful assistant built into a student architecture dashboard for Aaron at CBU (Fall 2026). ' +
+            'Be concise and practical. Here is the full dashboard context:\n\n' +
+            buildDashboardContext();
+
+        const apiMessages = [
+            ...claudeHistory.slice(0, -1).filter(m => m.role === 'user' || m.role === 'assistant'),
+            {
+                role: 'user',
+                content: [
+                    { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } },
+                    { type: 'text', text: userText },
+                ],
+            },
+        ];
+
+        typingEl.remove();
+        const reply = await callClaudeAPI(apiMessages, systemPrompt, 2000, 'pdfs-2024-09-25');
+        claudeHistory.push({ role: 'assistant', content: reply });
+        renderChatHistory();
+    } catch (err) {
+        typingEl.remove();
+        claudeHistory.push({ role: '_error', content: err.message });
+        renderChatHistory();
+    } finally {
+        if (sendBtn) sendBtn.disabled = false;
     }
 }
 
@@ -3234,7 +3503,14 @@ function bindEvents() {
     // Claude assistant
     document.getElementById('claudeSimpleBtn')?.addEventListener('click', openSimpleMode);
     document.getElementById('claudeComplexBtn')?.addEventListener('click', openComplexMode);
-    document.getElementById('claudeBackBtn')?.addEventListener('click', backToClaudeMenu);
+    document.getElementById('claudeBackBtn')?.addEventListener('click', () => {
+        dismissPdfCard();
+        backToClaudeMenu();
+    });
+    document.getElementById('dismissPdfCardBtn')?.addEventListener('click', dismissPdfCard);
+    document.getElementById('closePdfSummarizeModal')?.addEventListener('click', cancelSummarizePdf);
+    document.getElementById('cancelPdfSummarize')?.addEventListener('click', cancelSummarizePdf);
+    document.getElementById('confirmPdfSummarize')?.addEventListener('click', confirmSummarize);
     document.getElementById('claudeSendBtn')?.addEventListener('click', sendSimpleMessage);
     document.getElementById('claudeChatInput')?.addEventListener('keydown', e => {
         if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendSimpleMessage(); }
@@ -3263,7 +3539,7 @@ function bindEvents() {
 
     // Close modals on backdrop click
     ['scheduleModal', 'schedCustomEventModal', 'thesisLinkModal', 'calEventModal',
-     'sketchUploadModal', 'sketchExpandedModal'].forEach(id => {
+     'sketchUploadModal', 'sketchExpandedModal', 'pdfSummarizeModal'].forEach(id => {
         document.getElementById(id)?.addEventListener('click', e => {
             if (e.target === document.getElementById(id)) closeModal(id);
         });
@@ -3273,7 +3549,7 @@ function bindEvents() {
     document.addEventListener('keydown', e => {
         if (e.key === 'Escape') {
             ['scheduleModal', 'schedCustomEventModal', 'thesisLinkModal', 'calEventModal',
-             'sketchUploadModal', 'sketchExpandedModal'].forEach(id => {
+             'sketchUploadModal', 'sketchExpandedModal', 'pdfSummarizeModal'].forEach(id => {
                 if (document.getElementById(id)?.classList.contains('open')) closeModal(id);
             });
             if (document.getElementById('apiWarningModal')?.classList.contains('open')) resolveApiWarning(false);

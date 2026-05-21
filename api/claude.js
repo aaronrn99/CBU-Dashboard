@@ -16,15 +16,18 @@ module.exports = async function handler(req, res) {
         return res.status(500).json({ error: 'ANTHROPIC_API_KEY is not configured' });
     }
 
-    const { messages, model, system, max_tokens } = req.body;
+    const { messages, model, system, max_tokens, beta } = req.body;
+
+    const reqHeaders = {
+        'Content-Type':      'application/json',
+        'x-api-key':         apiKey,
+        'anthropic-version': '2023-06-01',
+    };
+    if (beta) reqHeaders['anthropic-beta'] = beta;
 
     const upstream = await fetch('https://api.anthropic.com/v1/messages', {
         method:  'POST',
-        headers: {
-            'Content-Type':      'application/json',
-            'x-api-key':         apiKey,
-            'anthropic-version': '2023-06-01',
-        },
+        headers: reqHeaders,
         body: JSON.stringify({ messages, model, system, max_tokens }),
     });
 

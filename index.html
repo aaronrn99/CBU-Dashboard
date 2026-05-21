@@ -496,6 +496,15 @@
                     </div>
                     <div class="claude-inline-chat">
                         <div class="claude-chat-history" id="claudeChatHistory"></div>
+                        <!-- Active PDF attachment card -->
+                        <div class="claude-pdf-card" id="claudePdfCard" style="display:none">
+                            <span class="claude-pdf-card-icon">📄</span>
+                            <div class="claude-pdf-card-info">
+                                <div class="claude-pdf-card-name" id="claudePdfCardName"></div>
+                                <div class="claude-pdf-card-meta" id="claudePdfCardMeta"></div>
+                            </div>
+                            <button class="claude-pdf-card-dismiss" id="dismissPdfCardBtn" aria-label="Dismiss PDF">✕</button>
+                        </div>
                         <div class="claude-chat-input-row">
                             <textarea class="claude-chat-input" id="claudeChatInput"
                                 placeholder="Ask about assignments, projects, deadlines…" rows="1"></textarea>
@@ -507,6 +516,23 @@
 
         </div>
     </main>
+
+    <!-- PDF Summarize Confirm Modal -->
+    <div class="modal-overlay" id="pdfSummarizeModal" role="dialog" aria-modal="true" aria-labelledby="pdfSummarizeTitle">
+        <div class="modal" style="max-width:400px">
+            <div class="modal-header">
+                <h3 id="pdfSummarizeTitle">Summarize PDF</h3>
+                <button class="modal-close" id="closePdfSummarizeModal" aria-label="Close">✕</button>
+            </div>
+            <div class="modal-body">
+                <p id="pdfSummarizeWarningText" style="font-size:13px;color:var(--text-2);line-height:1.6"></p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-ghost" id="cancelPdfSummarize">Cancel</button>
+                <button class="btn btn-primary" id="confirmPdfSummarize">Yes, summarize</button>
+            </div>
+        </div>
+    </div>
 
     <!-- API Warning Modal -->
     <div class="modal-overlay" id="apiWarningModal" role="dialog" aria-modal="true" aria-labelledby="apiWarningTitle">
