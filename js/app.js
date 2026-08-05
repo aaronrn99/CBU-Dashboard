@@ -1710,7 +1710,7 @@ const CBU_FALL_2026 = [
     // Milestones — blue
     { id: 'cbu-classes-begin', date: '2026-09-08',                        label: 'Classes Begin',                  category: 'milestone', builtin: true },
     { id: 'cbu-resume',        date: '2026-12-01',                        label: 'Classes Resume',                 category: 'milestone', builtin: true },
-    { id: 'cbu-closes',        date: '2026-12-11',                        label: 'Semester Closes',                category: 'milestone', builtin: true },
+    { id: 'cbu-closes',        date: '2026-12-18',                        label: 'Semester Closes',                category: 'milestone', builtin: true },
     // Deadlines — amber
     { id: 'cbu-add-deadline',  date: '2026-09-15',                        label: 'Last Day to Add a Class',        category: 'deadline',  builtin: true },
     { id: 'cbu-drop-deadline', date: '2026-09-22',                        label: 'Last Day to Drop with Refund',   category: 'deadline',  builtin: true },
