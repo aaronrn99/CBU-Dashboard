@@ -1287,6 +1287,10 @@ function renderSchedule() {
     const allCal = [...CBU_FALL_2026, ...state.calendarEvents, ...state.customEvents.map(e => ({ ...e, label: e.name }))];
 
     // ── Course-block coverage map ──────────────
+    // Classes only render on dates within the semester (Classes Begin – Semester Closes),
+    // so weeks before/after the term (e.g. August) show an empty schedule.
+    const semesterStart = CBU_FALL_2026.find(e => e.id === 'cbu-classes-begin').date;
+    const semesterEnd   = CBU_FALL_2026.find(e => e.id === 'cbu-closes').date;
     const timeIndex = {};
     TIMES.forEach((t, i) => { timeIndex[t] = i; });
     const coverage = Array.from({ length: DAY_FULL.length }, () => ({}));
@@ -1296,6 +1300,8 @@ function renderSchedule() {
         block.days.forEach(day => {
             const di = DAY_FULL.indexOf(day);
             if (di < 0) return;
+            const cellDateStr = toDateStr(weekDates[di]);
+            if (cellDateStr < semesterStart || cellDateStr > semesterEnd) return;
             for (let i = si; i < si + block.slots; i++) {
                 coverage[di][i] = { block, isStart: i === si };
             }
