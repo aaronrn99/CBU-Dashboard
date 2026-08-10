@@ -554,7 +554,165 @@ body {
     flex-shrink: 0;
 }
 
+/* ── Sketchpad ─────────────────────────── */
+.sp-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 9px 12px;
+    margin-bottom: 14px;
+}
+
+.sp-group {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.sp-group + .sp-group {
+    padding-left: 14px;
+    border-left: 1px solid var(--border-muted);
+}
+
+.sp-toolbar-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-left: auto;
+}
+
+.sp-tool {
+    width: 34px;
+    height: 34px;
+    border-radius: var(--radius-sm);
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--text-2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background var(--ease), color var(--ease), border-color var(--ease);
+}
+.sp-tool:hover { background: var(--bg-3); color: var(--text-1); }
+.sp-tool.active {
+    background: var(--green-dim);
+    border-color: var(--green);
+    color: var(--green);
+}
+
+.sp-btn {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-2);
+    font-family: inherit;
+    font-size: 12px;
+    padding: 6px 11px;
+    cursor: pointer;
+    transition: border-color var(--ease), color var(--ease), opacity var(--ease);
+}
+.sp-btn:hover:not(:disabled) { border-color: var(--green); color: var(--text-1); }
+.sp-btn:disabled { opacity: 0.32; cursor: default; }
+
+/* Thickness control */
+.sp-size-group { gap: 10px; }
+
+.sp-size-dot {
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background: var(--text-1);
+    flex-shrink: 0;
+    transition: width 0.12s ease, height 0.12s ease;
+}
+
+.sp-size-slider {
+    width: 108px;
+    accent-color: var(--green);
+    cursor: pointer;
+}
+
+.sp-size-val {
+    font-family: 'SFMono-Regular', 'Consolas', 'Liberation Mono', monospace;
+    font-size: 11px;
+    color: var(--text-3);
+    min-width: 16px;
+    text-align: right;
+}
+
+.sp-status {
+    font-family: 'SFMono-Regular', 'Consolas', 'Liberation Mono', monospace;
+    font-size: 11px;
+    color: var(--text-3);
+    letter-spacing: 0.02em;
+}
+.sp-status-error { color: var(--red); }
+
+/* Canvas — white paper against the dark UI */
+.sp-canvas-wrap {
+    height: min(68vh, 720px);
+    min-height: 320px;
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    box-shadow: 0 2px 14px rgba(0, 0, 0, 0.35);
+}
+
+#spCanvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    cursor: crosshair;
+    touch-action: none;   /* let the canvas own pen/touch input, not the scroller */
+}
+
+@media (max-width: 768px) {
+    .sp-toolbar { gap: 10px; padding: 8px 10px; }
+    .sp-group + .sp-group { padding-left: 10px; }
+    .sp-toolbar-right { width: 100%; margin-left: 0; }
+    .sp-size-slider { width: 78px; }
+    .sp-canvas-wrap { height: min(56vh, 460px); }
+}
+
 /* ── To-Do ─────────────────────────────── */
+/* ── To-Do Day / Week Switch ────────────── */
+.todo-mode-switch {
+    display: flex;
+    gap: 3px;
+    margin-bottom: 22px;
+    background: var(--bg-3);
+    padding: 4px;
+    border-radius: 8px;
+    width: fit-content;
+}
+
+.todo-mode-btn {
+    padding: 6px 18px;
+    border-radius: 6px;
+    border: none;
+    background: transparent;
+    color: var(--text-2);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background var(--ease), color var(--ease), box-shadow var(--ease);
+}
+
+.todo-mode-btn:hover:not(.active) { color: var(--text-1); }
+
+.todo-mode-btn.active {
+    background: var(--bg-2);
+    color: var(--text-1);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+}
+
 /* ── To-Do Day Navigation ───────────────── */
 .todo-day-nav {
     display: flex;
@@ -700,6 +858,152 @@ body {
 }
 .dtask:hover .dtask-del { opacity: 1; }
 .dtask-del:hover { color: var(--red); }
+
+/* ── To-Do Weekly Overview ──────────────── */
+.todo-week-grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 10px;
+}
+
+@media (max-width: 1250px) {
+    .todo-week-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+@media (max-width: 860px) {
+    .todo-week-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 520px) {
+    .todo-week-grid { grid-template-columns: 1fr; }
+}
+
+.twk-day {
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 13px 10px;
+    display: flex;
+    flex-direction: column;
+    min-height: 120px;
+    transition: border-color var(--ease);
+}
+
+.twk-day.is-today {
+    border-color: var(--green);
+    background: var(--green-dim);
+}
+
+.twk-day-head {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    column-gap: 6px;
+    row-gap: 1px;
+    width: 100%;
+    background: none;
+    border: none;
+    padding: 0 0 9px;
+    margin-bottom: 9px;
+    border-bottom: 1px solid var(--border-muted);
+    cursor: pointer;
+    font-family: inherit;
+    text-align: left;
+}
+
+.twk-day-name {
+    grid-column: 1;
+    grid-row: 1;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-1);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.twk-day-date {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    font-family: 'SFMono-Regular', 'Consolas', 'Liberation Mono', monospace;
+    font-size: 11px;
+    color: var(--text-3);
+    letter-spacing: 0.03em;
+    white-space: nowrap;
+}
+
+.twk-day-count {
+    grid-column: 2;
+    grid-row: 1;
+    font-family: 'SFMono-Regular', 'Consolas', 'Liberation Mono', monospace;
+    font-size: 10px;
+    color: var(--text-3);
+    background: var(--bg-3);
+    border-radius: 20px;
+    padding: 2px 7px;
+    justify-self: end;
+}
+
+.twk-day-head:hover .twk-day-name { color: var(--green); }
+
+.twk-tasks {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    flex: 1;
+}
+
+.twk-task {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    transition: opacity 0.22s ease;
+}
+
+.twk-task.completed { opacity: 0.4; }
+.twk-task.completed .twk-text {
+    text-decoration: line-through;
+    color: var(--text-3);
+}
+
+.twk-circle {
+    width: 15px;
+    height: 15px;
+    margin-top: 2px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    background: transparent;
+    flex-shrink: 0;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    color: #0d1117;
+    transition: border-color 0.15s ease, background 0.15s ease;
+}
+.twk-circle:hover { border-color: var(--green); }
+.twk-circle.checked {
+    background: var(--green);
+    border-color: var(--green);
+}
+
+.twk-text {
+    font-size: 12.5px;
+    line-height: 1.4;
+    color: var(--text-1);
+    word-break: break-word;
+}
+
+.twk-empty {
+    font-family: 'SFMono-Regular', 'Consolas', 'Liberation Mono', monospace;
+    font-size: 11px;
+    color: var(--text-3);
+    letter-spacing: 0.02em;
+}
+
+/* Single-column stack — cards shrink to their content */
+@media (max-width: 520px) {
+    .twk-day { min-height: 0; }
+}
 
 /* ── To-Do Add Row ──────────────────────── */
 .todo-add-row {
@@ -2000,6 +2304,22 @@ body {
 .thesis-tab-btn                       { color: rgba(61, 186, 114, 0.55); }
 .thesis-tab-btn.active,
 .thesis-tab-btn:hover:not(.active)    { color: #3dba72; }
+
+/* ── Sketchpad ──────────────────────────── */
+.sp-tool                              { color: rgba(61, 186, 114, 0.55); }
+.sp-tool:hover                        { color: #3dba72; }
+.sp-tool.active                       { color: #3dba72; }
+.sp-btn                               { color: rgba(61, 186, 114, 0.55); }
+.sp-btn:hover:not(:disabled)          { color: #3dba72; }
+
+/* ── To-Do day / week switch ────────────── */
+.todo-mode-btn                        { color: rgba(61, 186, 114, 0.55); }
+.todo-mode-btn.active,
+.todo-mode-btn:hover:not(.active)     { color: #3dba72; }
+
+/* ── To-Do weekly overview ──────────────── */
+.twk-day-name                         { color: #3dba72; }
+.twk-day-date                         { color: rgba(61, 186, 114, 0.55); }
 
 /* ── Custom Schedule Events (shared store) ── */
 .sched-clickable { cursor: pointer; }

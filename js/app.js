@@ -394,6 +394,7 @@ const SECTION_TITLES = {
     calendar:    'Calendar',
     files:       'Files',
     settings:    'Settings',
+    sketchpad:   'Sketchpad',
     claude:      'Claude',
 };
 
@@ -412,6 +413,7 @@ function showSection(id) {
     if (id === 'files')      renderFiles();
     if (id === 'settings')   renderSettingsSection();
     if (id === 'sketchlog')  renderSketchLog();
+    if (id === 'sketchpad')  initSketchpad();   // canvas needs a visible box to size itself
     if (id === 'claude') {
         document.getElementById('claudeModeSelect').style.display  = '';
         document.getElementById('claudeInlineChat').style.display  = 'none';
@@ -579,19 +581,52 @@ function renderAssignments() {
 // ── To-Do ────────────────────────────────────
 // ── Day-by-Day To-Do ──────────────────────────
 
-let _todosViewDate = null; // YYYY-MM-DD
+let _todosViewDate = null;   // YYYY-MM-DD
+let _todosViewMode = 'day';  // 'day' | 'week'
 
+// Local calendar date — NOT toISOString(), which is UTC and rolls over to
+// tomorrow after 5pm Pacific (making "Today" land on the wrong day).
 function todayDateStr() {
-    return new Date().toISOString().slice(0, 10);
+    return toDateStr(new Date());
 }
 
 function getTodosForDay(dateStr)        { return driveGet('todos_' + dateStr, []); }
 function saveTodosForDay(dateStr, todos) { driveSet('todos_' + dateStr, todos); }
 
+// Shift a YYYY-MM-DD string by N days. Anchored at local noon so DST
+// transitions can't slip the result into the neighbouring day.
+function shiftDateStr(dateStr, days) {
+    const d = new Date(dateStr + 'T12:00:00');
+    d.setDate(d.getDate() + days);
+    return toDateStr(d);
+}
+
+// The seven days (Sunday → Saturday) of the week containing dateStr.
+function weekDatesFor(dateStr) {
+    const d      = new Date(dateStr + 'T12:00:00');
+    const sunday = shiftDateStr(dateStr, -d.getDay());
+    return Array.from({ length: 7 }, (_, i) => shiftDateStr(sunday, i));
+}
+
 function todosGoDay(delta) {
-    const d = new Date(_todosViewDate + 'T12:00:00');
-    d.setDate(d.getDate() + delta);
-    _todosViewDate = d.toISOString().slice(0, 10);
+    _todosViewDate = shiftDateStr(_todosViewDate, delta);
+    renderTodos();
+}
+
+function todosGoWeek(delta) {
+    _todosViewDate = shiftDateStr(_todosViewDate, delta * 7);
+    renderTodos();
+}
+
+function todosSetMode(mode) {
+    _todosViewMode = mode;
+    renderTodos();
+}
+
+// Week-view day header → jump into that day's list
+function todosOpenDay(dateStr) {
+    _todosViewDate = dateStr;
+    _todosViewMode = 'day';
     renderTodos();
 }
 
@@ -606,13 +641,14 @@ function addTodo() {
     renderTodos();
 }
 
-function toggleTodo(id) {
-    const todos = getTodosForDay(_todosViewDate);
+function toggleTodo(id, dateStr) {
+    const day   = dateStr || _todosViewDate;
+    const todos = getTodosForDay(day);
     const todo  = todos.find(t => t.id === id);
     if (!todo) return;
     todo.completed = !todo.completed;
-    saveTodosForDay(_todosViewDate, todos);
-    if (todo.completed) {
+    saveTodosForDay(day, todos);
+    if (todo.completed && _todosViewMode === 'day') {
         const itemEl = document.querySelector(`.dtask[data-id="${id}"]`);
         if (itemEl) {
             itemEl.classList.add('completed', 'dtask--sinking');
@@ -630,13 +666,32 @@ function toggleTodo(id) {
     renderTodos();
 }
 
-function deleteTodo(id) {
-    saveTodosForDay(_todosViewDate, getTodosForDay(_todosViewDate).filter(t => t.id !== id));
+function deleteTodo(id, dateStr) {
+    const day = dateStr || _todosViewDate;
+    saveTodosForDay(day, getTodosForDay(day).filter(t => t.id !== id));
     renderTodos();
 }
 
 function renderTodos() {
     if (!_todosViewDate) _todosViewDate = todayDateStr();
+
+    document.querySelectorAll('.todo-mode-btn').forEach(btn => {
+        const on = btn.dataset.mode === _todosViewMode;
+        btn.classList.toggle('active', on);
+        btn.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+
+    const dayView  = document.getElementById('todoDayView');
+    const weekView = document.getElementById('todoWeekView');
+    const isWeek   = _todosViewMode === 'week';
+    if (dayView)  dayView.style.display  = isWeek ? 'none' : '';
+    if (weekView) weekView.style.display = isWeek ? '' : 'none';
+
+    if (isWeek) renderTodosWeek();
+    else        renderTodosDay();
+}
+
+function renderTodosDay() {
     const today   = todayDateStr();
     const isToday = _todosViewDate === today;
 
@@ -678,6 +733,345 @@ function renderTodos() {
             <button class="dtask-del" onclick="deleteTodo(${t.id})" aria-label="Delete task">✕</button>
         </div>`
     ).join('');
+}
+
+// ── Weekly Overview (Sunday → Saturday) ───────
+
+function renderTodosWeek() {
+    const MON_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const today = todayDateStr();
+    const days  = weekDatesFor(_todosViewDate);
+    const isThisWeek = days.includes(today);
+
+    const fmtShort = ds => {
+        const d = new Date(ds + 'T12:00:00');
+        return `${MON_SHORT[d.getMonth()]} ${d.getDate()}`;
+    };
+
+    const rangeEl = document.getElementById('todoWeekRange');
+    if (rangeEl) rangeEl.textContent = `${fmtShort(days[0])} – ${fmtShort(days[6])}`;
+
+    const badge = document.getElementById('todoThisWeekBadge');
+    if (badge) badge.style.display = isThisWeek ? '' : 'none';
+
+    const byDay = days.map(ds => ({ ds, todos: getTodosForDay(ds) }));
+    const total = byDay.reduce((n, d) => n + d.todos.length, 0);
+    const done  = byDay.reduce((n, d) => n + d.todos.filter(t => t.completed).length, 0);
+
+    const summaryEl = document.getElementById('todoWeekSummary');
+    if (summaryEl) {
+        summaryEl.textContent = total
+            ? `${done} of ${total} task${total === 1 ? '' : 's'} complete`
+            : 'No tasks this week';
+    }
+
+    const grid = document.getElementById('todoWeekGrid');
+    if (!grid) return;
+
+    const checkmark = '<svg viewBox="0 0 12 12" width="10" height="10"><polyline points="2,6 5,9 10,3" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+    grid.innerHTML = byDay.map(({ ds, todos }) => {
+        const d       = new Date(ds + 'T12:00:00');
+        const isToday = ds === today;
+        const dayDone = todos.filter(t => t.completed).length;
+
+        const sorted = [...todos].sort((a, b) => {
+            if (a.completed !== b.completed) return a.completed ? 1 : -1;
+            return b.id - a.id;
+        });
+
+        const body = sorted.length
+            ? sorted.map(t => `
+                <div class="twk-task${t.completed ? ' completed' : ''}">
+                    <button class="twk-circle${t.completed ? ' checked' : ''}"
+                            onclick="toggleTodo(${t.id}, '${ds}')"
+                            aria-label="${t.completed ? 'Mark incomplete' : 'Mark complete'}">
+                        ${t.completed ? checkmark : ''}
+                    </button>
+                    <span class="twk-text">${esc(t.text)}</span>
+                </div>`).join('')
+            : '<p class="twk-empty">No tasks</p>';
+
+        return `
+        <div class="twk-day${isToday ? ' is-today' : ''}">
+            <button class="twk-day-head" onclick="todosOpenDay('${ds}')"
+                    title="Open ${DAY_FULL[d.getDay()]}">
+                <span class="twk-day-name">${DAY_FULL[d.getDay()]}</span>
+                ${todos.length ? `<span class="twk-day-count">${dayDone}/${todos.length}</span>` : ''}
+                <span class="twk-day-date">${fmtShort(ds)}</span>
+            </button>
+            <div class="twk-tasks">${body}</div>
+        </div>`;
+    }).join('');
+}
+
+// ── Sketchpad ─────────────────────────────────
+// Strokes are stored in normalized 0–1 coordinates so the drawing survives
+// window resizes and redraws cleanly at any canvas size / pixel ratio.
+
+const SP_INK = '#1b1b1b';
+const SP_PAPER = '#ffffff';
+
+let _spCanvas  = null;
+let _spCtx     = null;
+let _spTool    = 'pen';
+let _spSize    = 3;
+let _spStrokes = [];        // committed strokes
+let _spHistory = [[]];      // snapshots for undo/redo
+let _spHistIdx = 0;
+let _spDrawing = null;      // stroke in progress
+let _spBound   = false;
+
+function spSnapshot() {
+    _spHistory = _spHistory.slice(0, _spHistIdx + 1);
+    _spHistory.push(_spStrokes.slice());
+    _spHistIdx = _spHistory.length - 1;
+    spUpdateButtons();
+}
+
+function spUndo() {
+    if (_spHistIdx === 0) return;
+    _spHistIdx--;
+    _spStrokes = _spHistory[_spHistIdx].slice();
+    spRedraw();
+    spUpdateButtons();
+}
+
+function spRedo() {
+    if (_spHistIdx >= _spHistory.length - 1) return;
+    _spHistIdx++;
+    _spStrokes = _spHistory[_spHistIdx].slice();
+    spRedraw();
+    spUpdateButtons();
+}
+
+function spClear() {
+    if (!_spStrokes.length) return;
+    _spStrokes = [];
+    spSnapshot();
+    spRedraw();
+}
+
+function spUpdateButtons() {
+    const undo = document.getElementById('spUndoBtn');
+    const redo = document.getElementById('spRedoBtn');
+    if (undo) undo.disabled = _spHistIdx === 0;
+    if (redo) redo.disabled = _spHistIdx >= _spHistory.length - 1;
+}
+
+function spSetTool(tool) {
+    _spTool = tool;
+    document.querySelectorAll('.sp-tool').forEach(b =>
+        b.classList.toggle('active', b.dataset.tool === tool));
+    if (_spCanvas) _spCanvas.style.cursor = tool === 'eraser' ? 'cell' : 'crosshair';
+}
+
+function spSetSize(px) {
+    _spSize = Math.max(1, Math.min(24, +px || 1));
+    const slider = document.getElementById('spSizeSlider');
+    const val    = document.getElementById('spSizeVal');
+    const dot    = document.getElementById('spSizeDot');
+    if (slider && +slider.value !== _spSize) slider.value = _spSize;
+    if (val) val.textContent = _spSize;
+    if (dot) { dot.style.width = _spSize + 'px'; dot.style.height = _spSize + 'px'; }
+}
+
+// Size the backing store to the element's CSS box × devicePixelRatio,
+// then repaint. Called on first show and on resize.
+function spResizeCanvas() {
+    if (!_spCanvas) return;
+    const wrap = document.getElementById('spCanvasWrap');
+    if (!wrap) return;
+    const w = wrap.clientWidth;
+    const h = wrap.clientHeight;
+    if (w < 2 || h < 2) return;              // section hidden — skip
+    const dpr = window.devicePixelRatio || 1;
+    _spCanvas.style.width  = w + 'px';
+    _spCanvas.style.height = h + 'px';
+    _spCanvas.width  = Math.round(w * dpr);
+    _spCanvas.height = Math.round(h * dpr);
+    _spCtx = _spCanvas.getContext('2d');
+    _spCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    spRedraw();
+}
+
+function spDrawStroke(ctx, stroke, w, h) {
+    const pts = stroke.points;
+    if (!pts.length) return;
+    ctx.strokeStyle = stroke.tool === 'eraser' ? SP_PAPER : SP_INK;
+    ctx.lineWidth   = stroke.size;
+    ctx.lineCap     = 'round';
+    ctx.lineJoin    = 'round';
+
+    if (pts.length === 1) {                   // a dot / single tap
+        ctx.beginPath();
+        ctx.arc(pts[0].x * w, pts[0].y * h, stroke.size / 2, 0, Math.PI * 2);
+        ctx.fillStyle = stroke.tool === 'eraser' ? SP_PAPER : SP_INK;
+        ctx.fill();
+        return;
+    }
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x * w, pts[0].y * h);
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x * w, pts[i].y * h);
+    ctx.stroke();
+}
+
+function spRedraw() {
+    if (!_spCtx || !_spCanvas) return;
+    const w = _spCanvas.clientWidth;
+    const h = _spCanvas.clientHeight;
+    _spCtx.fillStyle = SP_PAPER;
+    _spCtx.fillRect(0, 0, w, h);
+    _spStrokes.forEach(s => spDrawStroke(_spCtx, s, w, h));
+    if (_spDrawing) spDrawStroke(_spCtx, _spDrawing, w, h);
+}
+
+function spPointFromEvent(e) {
+    const r = _spCanvas.getBoundingClientRect();
+    return {
+        x: Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)),
+        y: Math.min(1, Math.max(0, (e.clientY - r.top)  / r.height)),
+    };
+}
+
+function spPointerDown(e) {
+    if (e.button !== undefined && e.button !== 0) return;
+    _spCanvas.setPointerCapture?.(e.pointerId);
+    _spDrawing = { tool: _spTool, size: _spSize, points: [spPointFromEvent(e)] };
+    spRedraw();
+    e.preventDefault();
+}
+
+function spPointerMove(e) {
+    if (!_spDrawing) return;
+    const p = spPointFromEvent(e);
+    if (_spTool === 'line') {
+        // Straight line: first point anchors, second tracks the cursor
+        _spDrawing.points[1] = p;
+    } else {
+        // Skip sub-pixel moves so stroke data stays compact
+        const last = _spDrawing.points[_spDrawing.points.length - 1];
+        const dx = (p.x - last.x) * _spCanvas.clientWidth;
+        const dy = (p.y - last.y) * _spCanvas.clientHeight;
+        if (dx * dx + dy * dy < 1) return;
+        _spDrawing.points.push(p);
+    }
+    spRedraw();
+    e.preventDefault();
+}
+
+function spPointerUp(e) {
+    if (!_spDrawing) return;
+    _spCanvas.releasePointerCapture?.(e.pointerId);
+    _spStrokes.push(_spDrawing);
+    _spDrawing = null;
+    spSnapshot();
+    spRedraw();
+}
+
+// Flatten to a PNG blob (paper background is already painted in)
+function spToBlob() {
+    return new Promise(resolve => _spCanvas.toBlob(resolve, 'image/png'));
+}
+
+function spSetStatus(msg, isError) {
+    const el = document.getElementById('spStatus');
+    if (!el) return;
+    el.textContent = msg || '';
+    el.classList.toggle('sp-status-error', !!isError);
+    if (msg && !isError) setTimeout(() => { if (el.textContent === msg) el.textContent = ''; }, 4000);
+}
+
+function spDownload() {
+    if (!_spStrokes.length) { spSetStatus('Nothing to download yet.', true); return; }
+    const a = document.createElement('a');
+    a.download = `sketch-${todayDateStr()}.png`;
+    a.href = _spCanvas.toDataURL('image/png');
+    a.click();
+}
+
+async function spSaveToDrive() {
+    if (!_spStrokes.length) { spSetStatus('Draw something first.', true); return; }
+    if (!isDriveConnected()) { spSetStatus('Connect Google Drive first.', true); return; }
+
+    const btn = document.getElementById('spSaveBtn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+    spSetStatus('Uploading to Drive…');
+
+    try {
+        const blob = await spToBlob();
+        const name = `sketch-${todayDateStr()}-${Date.now().toString().slice(-5)}.png`;
+        const file = new File([blob], name, { type: 'image/png' });
+
+        const folderId = await getSketchFolder();
+        const result   = await uploadFileToDrive(file, folderId, () => {});
+
+        // Cache the data URL so the gallery thumbnail appears immediately
+        // instead of waiting for Drive to generate one.
+        const reader = new FileReader();
+        reader.onload = e => { _sketchThumbs[result.id] = e.target.result; };
+        reader.readAsDataURL(blob);
+
+        state.sketches.unshift({
+            id:      Date.now(),
+            name,
+            driveId: result.id,
+            date:    todayDateStr(),
+            desc:    'Drawn in Sketchpad',
+            addedAt: new Date().toISOString(),
+            size:    blob.size,
+        });
+        save('sketches', state.sketches);
+        renderSketchLog();
+        spSetStatus('Saved to Sketch Log.');
+    } catch (err) {
+        console.warn('[Sketchpad] Save failed:', err.message);
+        spSetStatus('Save failed: ' + err.message, true);
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = 'Save to Drive'; }
+    }
+}
+
+function initSketchpad() {
+    _spCanvas = document.getElementById('spCanvas');
+    if (!_spCanvas || _spBound) { spResizeCanvas(); return; }
+    _spBound = true;
+
+    _spCanvas.addEventListener('pointerdown',   spPointerDown);
+    _spCanvas.addEventListener('pointermove',   spPointerMove);
+    _spCanvas.addEventListener('pointerup',     spPointerUp);
+    _spCanvas.addEventListener('pointercancel', spPointerUp);
+    _spCanvas.addEventListener('pointerleave',  e => { if (_spDrawing) spPointerUp(e); });
+
+    document.querySelectorAll('.sp-tool').forEach(btn =>
+        btn.addEventListener('click', () => spSetTool(btn.dataset.tool)));
+    document.getElementById('spSizeSlider')?.addEventListener('input', e => spSetSize(e.target.value));
+    document.getElementById('spUndoBtn')?.addEventListener('click', spUndo);
+    document.getElementById('spRedoBtn')?.addEventListener('click', spRedo);
+    document.getElementById('spClearBtn')?.addEventListener('click', spClear);
+    document.getElementById('spSaveBtn')?.addEventListener('click', spSaveToDrive);
+    document.getElementById('spDownloadBtn')?.addEventListener('click', spDownload);
+
+    window.addEventListener('resize', () => {
+        if (document.getElementById('sketchpad')?.classList.contains('active')) spResizeCanvas();
+    });
+
+    document.addEventListener('keydown', e => {
+        if (!document.getElementById('sketchpad')?.classList.contains('active')) return;
+        if (/^(INPUT|TEXTAREA)$/.test(e.target.tagName)) return;
+        const meta = e.ctrlKey || e.metaKey;
+        if (meta && e.key.toLowerCase() === 'z') {
+            e.preventDefault();
+            e.shiftKey ? spRedo() : spUndo();
+        } else if (!meta && e.key.toLowerCase() === 'p') spSetTool('pen');
+        else if (!meta && e.key.toLowerCase() === 'l') spSetTool('line');
+        else if (!meta && e.key.toLowerCase() === 'e') spSetTool('eraser');
+    });
+
+    spSetSize(_spSize);
+    spSetTool(_spTool);
+    spUpdateButtons();
+    spResizeCanvas();
 }
 
 // ── Studio Projects ───────────────────────────
@@ -2713,7 +3107,7 @@ function buildDashboardContext() {
     for (let offset = -30; offset <= 7; offset++) {
         const d = new Date(now);
         d.setDate(d.getDate() + offset);
-        const ds    = d.toISOString().slice(0, 10);
+        const ds    = toDateStr(d);   // must match the day view's storage keys
         const todos = getTodosForDay(ds);
         if (todos.length) {
             const label = offset === 0 ? `${ds} (TODAY)` : ds;
@@ -3418,8 +3812,18 @@ function _applyNavOrder(order) {
         const item = items.find(li => li.querySelector?.(`[data-section="${section}"]`));
         if (item && !ordered.includes(item)) ordered.push(item);
     });
-    // Append any new items not in saved order at the end
-    items.forEach(li => { if (!ordered.includes(li)) ordered.push(li); });
+    // Items added since the order was saved: splice each in just after its
+    // neighbour from the markup, rather than dumping it at the end — so a new
+    // nav entry lands where it was authored even for existing users.
+    items.forEach((li, idx) => {
+        if (ordered.includes(li)) return;
+        let at = 0;
+        for (let i = idx - 1; i >= 0; i--) {
+            const pos = ordered.indexOf(items[i]);
+            if (pos !== -1) { at = pos + 1; break; }
+        }
+        ordered.splice(at, 0, li);
+    });
     ordered.forEach(li => list.appendChild(li));
 }
 
@@ -3469,6 +3873,13 @@ function bindEvents() {
     document.getElementById('todoInput')?.addEventListener('keydown', e => {
         if (e.key === 'Enter') addTodo();
     });
+
+    // Todos — day / week view switch + week navigation
+    document.querySelectorAll('.todo-mode-btn').forEach(btn => {
+        btn.addEventListener('click', () => todosSetMode(btn.dataset.mode));
+    });
+    document.getElementById('todoPrevWeekBtn')?.addEventListener('click', () => todosGoWeek(-1));
+    document.getElementById('todoNextWeekBtn')?.addEventListener('click', () => todosGoWeek(1));
 
     // Studio projects
     document.getElementById('studioBackBtn')?.addEventListener('click', closeProject);
